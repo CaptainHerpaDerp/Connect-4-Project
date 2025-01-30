@@ -1,0 +1,19 @@
+{
+    "name": "Management",
+    "rootNamespace": "",
+    "references": [
+        "GameElements",
+        "Core",
+        "Utilities",
+        "UIManagement"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

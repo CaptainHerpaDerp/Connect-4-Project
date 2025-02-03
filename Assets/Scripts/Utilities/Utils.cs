@@ -205,34 +205,34 @@ namespace Utilities
             }
         }
 
-        public static IEnumerator FadeOutCanvasGroup(CanvasGroup canvasGroup, float fadeOutTime)
+        public static IEnumerator FadeOutCanvasGroup(CanvasGroup canvasGroup, float fadeOutTime, float fromAlpha = 1, float targetAlpha = 0)
         {
             float timeElapsed = 0;
 
             while (timeElapsed < fadeOutTime)
             {
-                canvasGroup.alpha = Mathf.Lerp(1, 0, timeElapsed / fadeOutTime);
+                canvasGroup.alpha = Mathf.Lerp(fromAlpha, targetAlpha, timeElapsed / fadeOutTime);
                 timeElapsed += Time.fixedDeltaTime;
                 yield return new WaitForFixedUpdate();
             }
 
-            canvasGroup.alpha = 0;
+            canvasGroup.alpha = targetAlpha;
             canvasGroup.interactable = false;
             canvasGroup.blocksRaycasts = false;
         }
 
-        private static IEnumerator FadeInCanvasGroup(CanvasGroup canvasGroup, float fadeOutTime)
+        public static IEnumerator FadeInCanvasGroup(CanvasGroup canvasGroup, float fadeOutTime, float fromAlpha = 0, float targetAlpha = 1)
         {
             float timeElapsed = 0;
 
             while (timeElapsed < fadeOutTime)
             {
-                canvasGroup.alpha = Mathf.Lerp(0, 1, timeElapsed / fadeOutTime);
+                canvasGroup.alpha = Mathf.Lerp(fromAlpha, targetAlpha, timeElapsed / fadeOutTime);
                 timeElapsed += Time.fixedDeltaTime;
                 yield return new WaitForFixedUpdate();
             }
 
-            canvasGroup.alpha = 1;
+            canvasGroup.alpha = targetAlpha;
             canvasGroup.interactable = true;
             canvasGroup.blocksRaycasts = true;
         }

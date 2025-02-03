@@ -227,7 +227,6 @@ namespace Management
 
         private void DoPlayerTurns()
         {
-
             if (isOnPlaceCooldown)
             {
                 return;
@@ -304,11 +303,17 @@ namespace Management
                     };
 
                     // Switch the player turn
-                    playerTurn = playerNumber == 1 ? 2 : 1;
-
+                    SwitchPlayerTurn(playerNumber);
                     break;
                 }
             }
+        }
+
+        private void SwitchPlayerTurn(int currentTurn)
+        {
+            playerTurn = currentTurn == 1 ? 2 : 1;
+
+            eventBus.Publish<int>("OnPlayerTurnChanged", playerTurn);
         }
 
         /// <summary>

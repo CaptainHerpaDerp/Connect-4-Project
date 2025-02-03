@@ -5,6 +5,8 @@ using Utilities;
 using Core;
 using UIManagement;
 using System;
+using VisualElements;
+using AI;
 
 namespace Management
 {
@@ -16,19 +18,20 @@ namespace Management
         [BoxGroup("Components"), SerializeField] LineRenderer lineRenderer;
 
         [BoxGroup("Prefabs"), SerializeField] GameObject tileSpacePrefab;
-        [BoxGroup("Prefabs"), SerializeField] GameObject tilePiecePrefab;
-
-        [BoxGroup("Tile Board Settings"), SerializeField] private int columns = 7;
-        [BoxGroup("Tile Board Settings"), SerializeField] private int rows = 6;
+        [BoxGroup("Prefabs"), SerializeField] PlacementPiece placementPiecePrefab;
+        [BoxGroup("Prefabs"), SerializeField] DroppingTilePiece droppingTilePiece;
 
         [BoxGroup("Tile Placement"), SerializeField] private Transform tileParentTransform;
         [BoxGroup("Tile Placement"), SerializeField] private Transform tilePlacementAreaTransform;
         [BoxGroup("Tile Placement"), SerializeField] private Transform tilePieceParentTransform;
 
-        [BoxGroup("Player Colours"), SerializeField] private Color[] playerColours;
-
         [Header("The duration of time a match will be shown before the round is reset")]
         [BoxGroup("Visual Settings"), SerializeField] private float connectionShowDuration = 0.5f;
+
+        [Header("The minimum wait duration before another tile can be placed")]
+        [BoxGroup("Placement Settings"), SerializeField] private float minPlaceWaitTime = 0.5f;
+
+        [BoxGroup("AI Settings"), SerializeField] private bool isAIEnabled = false;
 
         #endregion
 
@@ -42,23 +45,40 @@ namespace Management
         private GameObject[,] tileObjects;
 
         // Represents the pieces that have been placed on the board
-        private GameObject[,] tilePieces;
+        private PlacementPiece[,] placedPieces;
 
+        // Either 1 or 2
+        private int playerTurn = 1;
+        private bool visualizeTilePiece = true;
         private bool isRoundOver = false;
 
-        int tilesToWin = 4;
-        int p1TilesInARow = 0;
-        int p2TilesInARow = 0;
+        // The tile piece that will be placed on the board
+        private PlacementPiece previewPlacementPiece;
 
-        [ShowInInspector, ReadOnly, BoxGroup("Player Scores")] private int player1Score, player2Score;
+        [SerializeField] private float tilePieceYPos;
+        private bool isDropping = false;
+
+        // Tile Waiting
+        private bool isOnPlaceCooldown = false;
 
         // Singletons
         private EventBus eventBus;
+        private GamePrefs gamePrefs;
+        private AIPlayer aiPlayer;
+
+        // Game Prefs Getters
+        private int rows => gamePrefs.Rows;
+        private int columns => gamePrefs.Columns;
+        private int tilesToWin => gamePrefs.TilesToWin;
+
+        #region Initialization
 
         private void Start()
         {
             // Singleton initialization
             eventBus = EventBus.Instance;
+            gamePrefs = GamePrefs.Instance;
+            aiPlayer = AIPlayer.Instance;
 
             if (rows == 0 || columns == 0)
             {
@@ -72,29 +92,11 @@ namespace Management
                 return;
             }
 
+            previewPlacementPiece = Instantiate(placementPiecePrefab, Vector3.zero, Quaternion.identity);
+
             gameBoard.Initialize(columns);
 
             InitializeTileBoardEven();
-        }
-
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                InitializeTileBoardEven();
-            }
-
-            if (Input.GetMouseButtonDown(0))
-            {
-                if (!isRoundOver)
-                    PlaceTileOnColumn(gameBoard.GetSelectedColumnNumber(), 1);
-            }
-
-            if (Input.GetMouseButtonDown(1))
-            {
-                if (!isRoundOver)
-                    PlaceTileOnColumn(gameBoard.GetSelectedColumnNumber(), 2);
-            }
         }
 
         /// <summary>
@@ -118,15 +120,15 @@ namespace Management
             }
 
             // Destroy any existing tile pieces
-            if (tilePieces != null)
+            if (placedPieces != null)
             {
                 for (int x = 0; x < columns; x++)
                 {
                     for (int y = 0; y < rows; y++)
                     {
-                        if (tilePieces[x, y] != null)
+                        if (placedPieces[x, y] != null)
                         {
-                            Destroy(tilePieces[x, y]);
+                            Destroy(placedPieces[x, y]);
                         }
                     }
                 }
@@ -134,7 +136,7 @@ namespace Management
 
             tileBoard = new int[columns, rows];
             tileObjects = new GameObject[columns, rows];
-            tilePieces = new GameObject[columns, rows];
+            placedPieces = new PlacementPiece[columns, rows];
 
             Vector2 boardSize = new Vector2(tilePlacementAreaTransform.lossyScale.x, tilePlacementAreaTransform.lossyScale.y);
             boardCornerPosition = (Vector2)tilePlacementAreaTransform.position - boardSize / 2;
@@ -143,6 +145,10 @@ namespace Management
             float spacingX = (tilePlacementAreaTransform.transform.localScale.x / columns);
             float spacingY = (tilePlacementAreaTransform.transform.localScale.y / rows);
             tileScale = new Vector3(spacingX, spacingY, 1f);
+
+            // Set the scale of the preview tile piece and the dropping tile piece
+            previewPlacementPiece.transform.localScale = tileScale;
+            droppingTilePiece.transform.localScale = tileScale;
 
             for (int x = 0; x < columns; x++)
             {
@@ -164,12 +170,98 @@ namespace Management
             }
         }
 
+        #endregion
+
+        #region Update Methods
+
+        private void Update()
+        {
+            DoPlayerTurns();
+        }
+
+        private void FixedUpdate()
+        {
+            // Visualize the piece that will be placed on the board
+
+            if (visualizeTilePiece)
+            {
+                if (isAIEnabled && playerTurn == 2)
+                {
+                    // Do not visualize the tile piece if the AI is enabled and it is the AI's turn
+                    previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+                    return;
+                }
+
+                int colNumber = gameBoard.GetSelectedColumnNumber();
+                // Clamp the column number to be within the bounds of the board
+                if (colNumber == -1)
+                {
+                    previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+                    return;
+                }
+
+                // To get the last item in an array, we subtract 1 from the length or we can use the ^ operator
+
+                // get the last row in the column
+                int row = rows - 1;
+
+                previewPlacementPiece.transform.position = GetDropPointPosition(colNumber);
+
+                previewPlacementPiece.SetColour(gamePrefs.GetPlayerColour(playerTurn));
+            }
+        }
+
+        #endregion
+
+        #region Round Management
+
+        private void DoTilePlaceCooldown()
+        {
+            isOnPlaceCooldown = true;
+
+            StartCoroutine(Utils.WaitDurationAndExecuteCR(minPlaceWaitTime, () =>
+            {
+                isOnPlaceCooldown = false;
+            }));
+        }
+
+        private void DoPlayerTurns()
+        {
+
+            if (isAIEnabled && playerTurn == 2)
+            {
+                PlaceTileOnColumn(aiPlayer.GetMove(tileBoard), playerTurn);
+            }
+
+            if (isOnPlaceCooldown)
+            {
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (!isRoundOver)
+                {
+                    // Do not place a tile if the AI is enabled and it is the AI's turn
+                    if (isAIEnabled && playerTurn == 2)
+                    {
+                        return;
+                    }
+
+                    PlaceTileOnColumn(gameBoard.GetSelectedColumnNumber(), playerTurn);
+                }
+            }
+        }
+
         /// <summary>
         /// Place a piece on the game board on the specified column on the lowest available row 
         /// </summary>
         /// <param name="colNumber"></param>
         private void PlaceTileOnColumn(int colNumber, int playerNumber)
         {
+            // Put the tile placement on cooldown
+            DoTilePlaceCooldown();
+
             // If -1 is returned, the mouse is not over the game board or another error occurred
             if (colNumber == -1)
                 return;
@@ -181,19 +273,38 @@ namespace Management
                 {
                     // Set the ownership of the tile on the board
                     tileBoard[colNumber, row] = playerNumber;
-                    GameObject newTilePiece = Instantiate(tilePiecePrefab, tileObjects[colNumber, row].transform.position, Quaternion.identity, parent: tilePieceParentTransform);
+                    PlacementPiece newTilePiece = Instantiate(placementPiecePrefab, tileObjects[colNumber, row].transform.position, Quaternion.identity, parent: tilePieceParentTransform);
 
-                    // Set the tile piece in the tilePieces array to the new tile piece
-                    tilePieces[colNumber, row] = newTilePiece;
+                    // Set the tile piece in the placedPieces array to the new tile piece
+                    placedPieces[colNumber, row] = newTilePiece;
 
-                    Debug.Log($"Placed tile at ({colNumber},{row})");
-
-                    newTilePiece.GetComponent<SpriteRenderer>().color = playerColours[playerNumber - 1];
-
+                    // Instantiate the new tile piece
+                    newTilePiece.SetColour(gamePrefs.GetPlayerColour(playerNumber));
                     newTilePiece.transform.localScale = tileScale;
 
-                    // Since a tile was placed, check for a victory
+                    newTilePiece.Hide();
+
+                    DroppingTilePiece newDroppingTilePiece = Instantiate(droppingTilePiece, new Vector2(1000, 1000), Quaternion.identity);
+                    Vector2 dropPoint = GetDropPointPosition(colNumber);
+
+                    // Drop the tile piece from the top of the board to the placed position
+                    newDroppingTilePiece.DropToPosition(dropPoint, newTilePiece.transform.position, gamePrefs.GetPlayerColour(playerNumber));
+
+                    isDropping = true;
                     CheckVictory(colNumber, row, playerNumber);
+
+                    newDroppingTilePiece.OnPositionReached += () =>
+                    {
+                        if (newTilePiece != null)
+                        {
+                            newTilePiece.Show();
+                        }
+
+                        isDropping = false;
+                    };
+
+                    // Switch the player turn
+                    playerTurn = playerNumber == 1 ? 2 : 1;
 
                     break;
                 }
@@ -212,8 +323,58 @@ namespace Management
             else CheckDiagonal(placedCol, placedRow, player);
         }
 
-        #region Line Check Methods
+        private void EndRound(int winner)
+        {
+            isRoundOver = true;
 
+            StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isDropping, () =>
+            {
+                Debug.Log("Drop stopped");
+
+                lineRenderer.enabled = true;
+
+                StartCoroutine(Utils.WaitDurationAndExecuteCR(connectionShowDuration, () =>
+                {
+                    ResetPlacedPieces();
+                    isRoundOver = false;
+                }));
+
+                if (winner == 1)
+                {
+                    // Publish to the event bus that the round is over, along with the winning player number
+                    eventBus.Publish<int>("RoundOver", 1);
+                }
+                else if (winner == 2)
+                {
+                    eventBus.Publish<int>("RoundOver", 2);
+                }
+            }));
+        }
+
+        private void ResetPlacedPieces()
+        {
+            // Hide the line renderer
+            lineRenderer.positionCount = 0;
+
+            // Reset the ownership of each tile on the board
+            tileBoard = new int[columns, rows];
+
+            // Destroy any existing tile pieces
+            if (placedPieces != null)
+            {
+                placedPieces = new PlacementPiece[columns, rows];
+            }
+
+            // Destroy any existing tile piece objects
+            foreach (Transform child in tilePieceParentTransform)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+
+        #endregion
+
+        #region Line Check Methods
         private bool CheckHorizontal(int placedCol, int placedRow, int player)
         {
             int count = 1;
@@ -283,7 +444,7 @@ namespace Management
 
             for (int i = 1; i < tilesToWin; i++)
             {
-                // Check upwards
+                // Check downwards
                 int row = placedRow - i;
 
                 // Check bounds and ownership
@@ -326,9 +487,9 @@ namespace Management
             Vector2 trIndex = new(placedCol, placedRow);
             Vector2 blIndex = new(placedCol, placedRow);
 
+            // Check the tiles to the right and above the placed tile
             for (int i = 1; i < tilesToWin; i++)
             {
-                // Check the tile to the right and above the placed tile
                 int col = placedCol + i, row = placedRow + i;
 
                 // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
@@ -341,9 +502,9 @@ namespace Management
                 trIndex = new(col, row);
             }
 
+            // Check the tiles to the left and below the placed tile
             for (int i = 1; i < tilesToWin; i++)
             {
-                // Check the tile to the left and below the placed tile
                 int col = placedCol - i, row = placedRow - i;
 
                 // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
@@ -372,9 +533,9 @@ namespace Management
             Vector2 tlIndex = new(placedCol, placedRow);
             Vector2 brIndex = new(placedCol, placedRow);
 
+           // Check the tiles to the left above the placed tile
             for (int i = 1; i < tilesToWin; i++)
             {
-                // Check the tile to the left above the placed tile
                 int col = placedCol - i, row = placedRow + i;
 
                 if (col < 0 || row >= rows || tileBoard[col, row] != player) break;
@@ -384,9 +545,9 @@ namespace Management
                 tlIndex = new(col, row);
             }
 
+            // Check the tiles to the right and below the placed tile 
             for (int i = 1; i < tilesToWin; i++)
             {
-                // Check the tile to the right and below the placed tile 
                 int col = placedCol + i, row = placedRow - i;
 
                 if (col >= columns || row < 0 || tileBoard[col, row] != player) break;
@@ -408,49 +569,29 @@ namespace Management
 
         #endregion
 
-        private void EndRound(int winner)
+        #region Utility Methods
+
+        /// <summary>
+        /// Returns the position above the board where the tile piece will be dropped from
+        /// </summary>
+        /// <returns></returns>
+        private Vector2 GetDropPointPosition(int col)
         {
-            isRoundOver = true;
-            StartCoroutine(Utils.WaitDurationAndExecuteCR(connectionShowDuration, () =>
-            {
-                ResetPlacedPieces();
-                isRoundOver = false;
-            }));
+            // Get the position based on the tile position on the board corresponding to the column and row
+            Vector2 position = tileObjects[col, rows - 1].transform.position;
 
-            if (winner == 1)
-            {
-                player1Score++;
-                eventBus.Publish<int, int>("RoundOver", 1, player1Score);
-            }
-            else if (winner == 2)
-            {
-                player2Score++;
-                eventBus.Publish<int, int>("RoundOver", 2, player2Score);
-            }
+            // Apply a vertical offset to the position to place the tile piece above the board
+            position += new Vector2(0, tilePieceYPos);
 
-            // Repaint the inspector to be able to see the updated scores
-            UnityEditor.EditorUtility.SetDirty(this);
+            return position;
         }
 
-        private void ResetPlacedPieces()
+
+        #endregion
+
+        public void ToggleAI()
         {
-            // Hide the line renderer
-            lineRenderer.positionCount = 0;
-
-            // Reset the ownership of each tile on the board
-            tileBoard = new int[columns, rows];
-
-            // Destroy any existing tile pieces
-            if (tilePieces != null)
-            {
-                tilePieces = new GameObject[columns, rows];
-            }
-
-            // Destroy any existing tile piece objects
-            foreach (Transform child in tilePieceParentTransform)
-            {
-                Destroy(child.gameObject);
-            }
+            isAIEnabled = !isAIEnabled;
         }
 
         private void DrawLineRenderer(Vector2 startPos, Vector2 endPos)
@@ -458,6 +599,8 @@ namespace Management
             lineRenderer.positionCount = 2;
             lineRenderer.SetPosition(0, startPos);
             lineRenderer.SetPosition(1, endPos);
+
+            lineRenderer.enabled = false;
         }
     }
 }

@@ -5,7 +5,9 @@
         "GameElements",
         "Core",
         "Utilities",
-        "UIManagement"
+        "UIManagement",
+        "VisualElements",
+        "AIPlayer"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

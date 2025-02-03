@@ -1,0 +1,22 @@
+fileFormatVersion: 2
+guid: dd8837a34f80ea24eba5f85e3e118c5c
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontNames:
+  - Brittle
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: e04a9c80b605b4548ad4971abb8416f9, type: 3}
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

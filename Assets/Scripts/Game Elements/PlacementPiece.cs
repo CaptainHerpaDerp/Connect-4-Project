@@ -1,18 +1,31 @@
-using System.Collections;
-using System.Collections.Generic;
+using Sirenix.OdinInspector;
 using UnityEngine;
 
 public class PlacementPiece : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    [BoxGroup("Component References"), SerializeField] private SpriteRenderer spriteRenderer;
+
+    public void SetColour(Color color)
     {
-        
+        spriteRenderer.color = color;
     }
 
-    // Update is called once per frame
-    void Update()
+    #region Visibility
+
+    public void Hide()
     {
-        
+        spriteRenderer.enabled = false;
     }
+
+    public void Show()
+    {
+        spriteRenderer.enabled = true;
+    }
+
+    public void ToggleVisibility(bool isVisible)
+    {
+        spriteRenderer.enabled = isVisible;
+    }
+
+    #endregion
 }

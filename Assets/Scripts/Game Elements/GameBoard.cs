@@ -27,7 +27,6 @@ namespace GameElements
 
             if (!Physics2D.Raycast(mousePosition, Vector2.zero))
             {
-                Debug.Log("Mouse is not over the game board");
                 return -1;
             }
 

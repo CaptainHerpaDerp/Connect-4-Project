@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 9031610987439638873}
   - component: {fileID: 3274678988232721801}
+  - component: {fileID: 557437730414904830}
   m_Layer: 0
   m_Name: GamePieceObject
   m_TagString: Untagged
@@ -72,8 +73,8 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 2
-  m_Sprite: {fileID: 21300000, guid: 6810dac1ee645cf4fb1d3528f893e2ad, type: 3}
+  m_SortingOrder: 3
+  m_Sprite: {fileID: 21300000, guid: 56ae26940cff70e4bb226cc129276fdf, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -84,3 +85,16 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &557437730414904830
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4107092370456203455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a53d7d9a14cc664facdabbca5d4ae05, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spriteRenderer: {fileID: 3274678988232721801}

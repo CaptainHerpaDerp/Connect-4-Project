@@ -228,14 +228,14 @@ namespace Management
         private void DoPlayerTurns()
         {
 
-            if (isAIEnabled && playerTurn == 2)
-            {
-                PlaceTileOnColumn(aiPlayer.GetMove(tileBoard), playerTurn);
-            }
-
             if (isOnPlaceCooldown)
             {
                 return;
+            }
+
+            if (isAIEnabled && playerTurn == 2)
+            {
+                PlaceTileOnColumn(aiPlayer.GetMove(tileBoard), playerTurn);
             }
 
             if (Input.GetMouseButtonDown(0))

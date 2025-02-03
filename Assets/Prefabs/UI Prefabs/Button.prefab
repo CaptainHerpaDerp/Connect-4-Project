@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8105124064876624002}
   - component: {fileID: 3875309928183100390}
   - component: {fileID: 2570303992398728752}
+  - component: {fileID: 3519958682740402493}
   m_Layer: 5
   m_Name: Button
   m_TagString: Untagged
@@ -123,6 +124,21 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &3519958682740402493
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1956900398910228896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c9c3c81f325440a41bd7324958df5636, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  buttonText: {fileID: 6511850502409976211}
+  normalColour: {r: 1, g: 1, b: 1, a: 0.29803923}
+  selectedColour: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &5065671557046908370
 GameObject:
   m_ObjectHideFlags: 0
@@ -197,8 +213,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 1291845631
+  m_fontColor: {r: 1, g: 1, b: 1, a: 0.29803923}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

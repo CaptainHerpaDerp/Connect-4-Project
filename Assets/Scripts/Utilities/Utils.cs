@@ -205,6 +205,38 @@ namespace Utilities
             }
         }
 
+        public static IEnumerator FadeOutCanvasGroup(CanvasGroup canvasGroup, float fadeOutTime)
+        {
+            float timeElapsed = 0;
+
+            while (timeElapsed < fadeOutTime)
+            {
+                canvasGroup.alpha = Mathf.Lerp(1, 0, timeElapsed / fadeOutTime);
+                timeElapsed += Time.fixedDeltaTime;
+                yield return new WaitForFixedUpdate();
+            }
+
+            canvasGroup.alpha = 0;
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
+
+        private static IEnumerator FadeInCanvasGroup(CanvasGroup canvasGroup, float fadeOutTime)
+        {
+            float timeElapsed = 0;
+
+            while (timeElapsed < fadeOutTime)
+            {
+                canvasGroup.alpha = Mathf.Lerp(0, 1, timeElapsed / fadeOutTime);
+                timeElapsed += Time.fixedDeltaTime;
+                yield return new WaitForFixedUpdate();
+            }
+
+            canvasGroup.alpha = 1;
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
+
         #endregion
 
         #region NavMesh

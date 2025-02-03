@@ -11,10 +11,11 @@ public class CameraController : MonoBehaviour
     // Have a toggle button to set the easing function
     [BoxGroup("Movement Settings"), SerializeField] private bool useEaseInOutSine = true;
 
-
-
+    /// <summary>
+    /// Moves the camera down to the end position.
+    /// </summary>
     [Button]
-    private void MoveCamera()
+    public void MoveCameraDown()
     {
         transform.position = new Vector3(transform.position.x, startY, transform.position.z);
 

@@ -1,4 +1,5 @@
 using Sirenix.OdinInspector;
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -11,18 +12,20 @@ public class CameraController : MonoBehaviour
     // Have a toggle button to set the easing function
     [BoxGroup("Movement Settings"), SerializeField] private bool useEaseInOutSine = true;
 
+    #region Camera Positioning
+
     /// <summary>
     /// Moves the camera down to the end position.
     /// </summary>
     [Button]
-    public void MoveCameraDown()
+    public void MoveCameraDown(Action onPositionReached = null)
     {
         transform.position = new Vector3(transform.position.x, startY, transform.position.z);
 
-        StartCoroutine(DropCameraToPosition());
+        StartCoroutine(DropCameraToPosition(onPositionReached));
     }
 
-    private IEnumerator DropCameraToPosition()
+    private IEnumerator DropCameraToPosition(Action onPositionReached = null)
     {
         float elapsedTime = 0f;
         float startY = transform.position.y;
@@ -49,8 +52,22 @@ public class CameraController : MonoBehaviour
             yield return null;
         }
 
+        // Set the final position
         transform.position = new Vector3(transform.position.x, endY, transform.position.z);
+
+        // Invoke the callback (if not null)
+        onPositionReached?.Invoke();
     }
+
+    /// <summary>
+    /// Sets the camera to the start position using the given start Y value
+    /// </summary>
+    public void SetCameraStartPosition()
+    {
+        transform.position = new Vector3(transform.position.x, startY, transform.position.z);
+    }
+
+    #endregion
 
     private float EaseInOutSine(float t)
     {

@@ -1,12 +1,15 @@
 using Sirenix.OdinInspector;
 using UnityEngine;
 using Utilities;
+using TMPro;
 
 namespace UIElements
 {
     public class PlayerTurnPanel : MonoBehaviour
     {
         [BoxGroup("Component References"), SerializeField] private CanvasGroup canvasGroup;
+
+        [BoxGroup("Component References"), SerializeField] private TextMeshProUGUI turnPromptTextComponent;
 
         [BoxGroup("Visibility Settings"), SerializeField] private float fadeTime = 0.25f;
 
@@ -17,12 +20,14 @@ namespace UIElements
 
         public void Show()
         {
-            StartCoroutine(Utils.FadeInCanvasGroup(canvasGroup, fadeTime, fromAlpha: fadedAlpha));            
+            StartCoroutine(Utils.FadeInCanvasGroup(canvasGroup, fadeTime, fromAlpha: fadedAlpha));
+            turnPromptTextComponent.enabled = true;
         }
 
         public void Hide()
         {
             StartCoroutine(Utils.FadeOutCanvasGroup(canvasGroup, fadeTime, targetAlpha: fadedAlpha));
+            turnPromptTextComponent.enabled = false;
         }
 
         public void SetActive(bool active)

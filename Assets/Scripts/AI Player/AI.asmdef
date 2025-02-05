@@ -2,7 +2,8 @@
     "name": "AIPlayer",
     "rootNamespace": "",
     "references": [
-        "GUID:639f60a0afcf73e49bce373902eccaa9"
+        "GUID:639f60a0afcf73e49bce373902eccaa9",
+        "GUID:ead37f2fe6a09cc4d934124ccc39a968"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

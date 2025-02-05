@@ -1,27 +1,28 @@
-using Sirenix.OdinInspector;
 using UnityEngine;
 
 namespace Core
 {
-    public class GamePrefs : Singleton<GamePrefs>
+    /// <summary>
+    /// Stores constant variables for the game
+    /// </summary>
+    public static class GamePrefs
     {
-        [BoxGroup("Player Colours"), SerializeField] private Color[] playerColours;
+        public const int ScoreToWin = 3;
 
-        [BoxGroup("Game Conditions"), SerializeField] private int scoreToWin = 3;
+        public const int Columns = 7;
+        public const int Rows = 6;
+        public const int TilesToWin = 4;
 
-        [BoxGroup("Tile Board Settings"), SerializeField] private int columns = 7;
-        [BoxGroup("Tile Board Settings"), SerializeField] private int rows = 6;
-        [BoxGroup("Tile Board Settings"), SerializeField] private int tilesToWin = 4;
+        public const int EMPTY = 0;
+        public const int OPPONENT = 1;
+        public const int AI_PLAYER = 2;
 
+        private static Color player1Colour = new(14f / 255f, 107f / 255f, 220f / 255f);
+        private static Color player2Colour = new(221f / 255f, 14f / 255f, 27f / 255f);
 
-        // Public accessors
-        public int ScoreToWin => scoreToWin;
-        public int Columns => columns;
-        public int Rows => rows;
-        public int TilesToWin => tilesToWin;    
+        private static Color[] playerColours = { player1Colour, player2Colour };
 
-
-        public Color GetPlayerColour(int playerNumber)
+        public static Color GetPlayerColour(int playerNumber)
         {
             return playerColours[playerNumber - 1];
         }

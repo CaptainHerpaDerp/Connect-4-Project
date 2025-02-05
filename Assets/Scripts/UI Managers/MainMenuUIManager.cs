@@ -1,3 +1,4 @@
+using Core;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,17 +11,30 @@ namespace UIManagement
     /// </summary>
     public class MainMenuUIManager : MonoBehaviour
     {
-        [BoxGroup("Component References"), SerializeField] private CanvasGroup mainMenuCanvasGroup;
-
         [BoxGroup("Component References"), SerializeField] private CameraController cameraController;
+
+        [BoxGroup("Menu Canvas Groups"), SerializeField] private CanvasGroup mainMenuCanvasGroup;
+        [BoxGroup("Menu Canvas Groups"), SerializeField] private CanvasGroup gameMenuCanvasGroup;
 
         [BoxGroup("Buttons"), SerializeField] private Button play1v1Button, playVsCPUButton, quitButton;
 
+        [BoxGroup("Menu Settings"), SerializeField] private bool showMainMenuOnStart = true;
+
+        // Singleton Methods
+        private EventBus eventBus;
+
         private void Start()
         {
+            eventBus = EventBus.Instance;
+
             if (mainMenuCanvasGroup == null)
             {
                 Debug.LogError("MainMenuUIManager: mainMenuCanvasGroup is not assigned!");
+            }
+
+            if (gameMenuCanvasGroup == null)
+            {
+                Debug.LogError("MainMenuUIManager: gameMenuCanvasGroup is not assigned!");
             }
 
             if (cameraController == null)
@@ -34,6 +48,19 @@ namespace UIManagement
             }
             
             DoButtonSubscriptions();
+
+            if (showMainMenuOnStart)
+            {
+                mainMenuCanvasGroup.alpha = 1;
+                mainMenuCanvasGroup.interactable = true;
+                mainMenuCanvasGroup.blocksRaycasts = true;
+
+                gameMenuCanvasGroup.alpha = 0;
+                gameMenuCanvasGroup.interactable = false;
+                gameMenuCanvasGroup.blocksRaycasts = false;
+
+                cameraController.SetCameraStartPosition();
+            }
         }
 
         private void DoButtonSubscriptions()
@@ -49,19 +76,33 @@ namespace UIManagement
         {
             HideMainMenu();
 
-            cameraController.MoveCameraDown();
+            // Move the camera down, when the position is reached, start the game
+            cameraController.MoveCameraDown(onPositionReached: () =>
+            {
+                ShowGameMenu();
+
+                // Publish the game start event, with the CPU flag set to false
+                eventBus.Publish<bool>("OnGameStart", false);
+            });
         }
 
         private void StartGameVsCPU()
         {
             HideMainMenu();
 
+            // Move the camera down, when the position is reached, start the game
+            cameraController.MoveCameraDown(onPositionReached: () =>
+            {
+                ShowGameMenu();
+
+                // Publish the game start event, with the CPU flag set to true
+                eventBus.Publish<bool>("OnGameStart", true);
+            });
         }
 
         private void QuitGame()
         {
             HideMainMenu();
-
         }
 
         #endregion
@@ -74,6 +115,11 @@ namespace UIManagement
             mainMenuCanvasGroup.blocksRaycasts = false;
 
             StartCoroutine(Utils.FadeOutCanvasGroup(mainMenuCanvasGroup, 0.5f));          
+        }
+
+        private void ShowGameMenu()
+        {
+            StartCoroutine(Utils.FadeInCanvasGroup(gameMenuCanvasGroup, 0.25f));
         }
 
         #endregion

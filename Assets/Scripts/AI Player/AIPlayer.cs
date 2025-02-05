@@ -2,7 +2,7 @@ using UnityEngine;
 using Core;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
-
+using Utilities;
 namespace AI
 {
     public enum AIDifficulty
@@ -26,22 +26,14 @@ namespace AI
         [BoxGroup("AI Evaluation/AI"), SerializeField] private int aiTwoEval = 2;
 
         // Define some constant values to make the code more readable
-        const int EMPTY = 0;
-        const int OPPONENT = 1;
-        const int AI_PLAYER = 2;
-
-        // Singletons
-        private GamePrefs gamePrefs;
+        const int EMPTY = GamePrefs.EMPTY;
+        const int OPPONENT = GamePrefs.OPPONENT;
+        const int AI_PLAYER = GamePrefs.AI_PLAYER;
 
         // Game Prefs Getters
-        private int rows => gamePrefs.Rows;
-        private int columns => gamePrefs.Columns;
-        private int tilesToWin => gamePrefs.TilesToWin;
-
-        private void Start()
-        {
-            gamePrefs = GamePrefs.Instance;
-        }
+        private int rows => GamePrefs.Rows;
+        private int columns => GamePrefs.Columns;
+        private int tilesToWin => GamePrefs.TilesToWin;
 
         public int GetMove(int[,] gameBoard)
         {
@@ -240,8 +232,6 @@ namespace AI
 
         #region Victory Check
 
-
-
         int EvaluateBoard(int[,] tileBoard, int placedCol, int placedRow, int depth)
         {
             // Check for immediate opponent win
@@ -269,30 +259,32 @@ namespace AI
                 if (tileBoard[centerCol, row] == OPPONENT) score -= 3;
             }
 
-            score += CheckHorizontalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 4) * aiWinEval + depth;
-            score += CheckHorizontalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 3) * aiThreeEval;
-            score += CheckHorizontalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 2) * aiTwoEval;
+            // TODO: The AI should not be concerned about a row of 2 if there isn't 2 more tiles to complete the row
 
-            score += CheckVerticalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 4) * aiWinEval + depth;
-            score += CheckVerticalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 3) * aiThreeEval;
-            score += CheckVerticalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 2) * aiTwoEval;
+            score += TilePatternCheck.CheckHorizontalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 4) * aiWinEval + depth;
+            score += TilePatternCheck.CheckHorizontalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 3) * aiThreeEval;
+            score += TilePatternCheck.CheckHorizontalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 2) * aiTwoEval;
 
-            score += CheckDiagonalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 4) * aiWinEval + depth;
-            score += CheckDiagonalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 3) * aiThreeEval;
-            score += CheckDiagonalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 2) * aiTwoEval;
+            score += TilePatternCheck.CheckVerticalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 4) * aiWinEval + depth;
+            score += TilePatternCheck.CheckVerticalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 3) * aiThreeEval;
+            score += TilePatternCheck.CheckVerticalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 2) * aiTwoEval;
+
+            score += TilePatternCheck.CheckDiagonalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 4) * aiWinEval + depth;
+            score += TilePatternCheck.CheckDiagonalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 3) * aiThreeEval;
+            score += TilePatternCheck.CheckDiagonalScore(tileBoard, placedCol, placedRow, AI_PLAYER, 2) * aiTwoEval;
 
 
-            score -= CheckHorizontalScore(tileBoard, placedCol, placedRow, OPPONENT, 4) * playerWinEval - depth;
-            score -= CheckHorizontalScore(tileBoard, placedCol, placedRow, OPPONENT, 3) * playerThreeEval;
-            score -= CheckHorizontalScore(tileBoard, placedCol, placedRow, OPPONENT, 2) * playerTwoEval;
+            score -= TilePatternCheck.CheckHorizontalScore(tileBoard, placedCol, placedRow, OPPONENT, 4) * playerWinEval - depth;
+            score -= TilePatternCheck.CheckHorizontalScore(tileBoard, placedCol, placedRow, OPPONENT, 3) * playerThreeEval;
+            score -= TilePatternCheck.CheckHorizontalScore(tileBoard, placedCol, placedRow, OPPONENT, 2) * playerTwoEval;
 
-            score -= CheckVerticalScore(tileBoard, placedCol, placedRow, OPPONENT, 4) * playerWinEval - depth;
-            score -= CheckVerticalScore(tileBoard, placedCol, placedRow, OPPONENT, 3) * playerThreeEval;
-            score -= CheckVerticalScore(tileBoard, placedCol, placedRow, OPPONENT, 2) * playerTwoEval;
+            score -= TilePatternCheck.CheckVerticalScore(tileBoard, placedCol, placedRow, OPPONENT, 4) * playerWinEval - depth;
+            score -= TilePatternCheck.CheckVerticalScore(tileBoard, placedCol, placedRow, OPPONENT, 3) * playerThreeEval;
+            score -= TilePatternCheck.CheckVerticalScore(tileBoard, placedCol, placedRow, OPPONENT, 2) * playerTwoEval;
 
-            score -= CheckDiagonalScore(tileBoard, placedCol, placedRow, OPPONENT, 4) * playerWinEval - depth;
-            score -= CheckDiagonalScore(tileBoard, placedCol, placedRow, OPPONENT, 3) * playerThreeEval;
-            score -= CheckDiagonalScore(tileBoard, placedCol, placedRow, OPPONENT, 2) * playerTwoEval;
+            score -= TilePatternCheck.CheckDiagonalScore(tileBoard, placedCol, placedRow, OPPONENT, 4) * playerWinEval - depth;
+            score -= TilePatternCheck.CheckDiagonalScore(tileBoard, placedCol, placedRow, OPPONENT, 3) * playerThreeEval;
+            score -= TilePatternCheck.CheckDiagonalScore(tileBoard, placedCol, placedRow, OPPONENT, 2) * playerTwoEval;
 
             return score;
         }
@@ -313,332 +305,24 @@ namespace AI
         }
 
         /// <summary>
-        /// Based on the current board, check if the AI can win in the next move
-        /// </summary>
-        /// <param name="tileBoard"></param>
-        /// <returns>Return the column the AI needs to place a tile on</returns>
-        int CheckVictory(int[,] tileBoard)
-        {
-            // Loop through each tile on the board
-            for (int col = 0; col < columns; col++)
-            {
-                for (int row = 0; row < rows; row++)
-                {
-                    // If the tile is the AI's, check for a victory
-                    if (tileBoard[col, row] == AI_PLAYER)
-                    {
-                        if (CheckVictory(tileBoard, col, row, AI_PLAYER))
-                        {
-                            return col;
-                        }
-                    }
-                }
-            }
-
-            return 0;
-        }
-        private int CheckHorizontalScore(int[,] tileBoard, int placedCol, int placedRow, int player, int countCondition)
-        {
-            int count = 1;
-
-            for (int i = 1; i < countCondition; i++)
-            {
-                // Check to the right
-                int col = placedCol + i;
-
-                // Check for bounds and ownership, break the loop if the tile is not the player's or if we are out of bounds
-                if (col >= columns || tileBoard[col, placedRow] != player) break;
-
-                // Otherwise, increase the count and set the new farthest right index
-                count++;
-            }
-
-            for (int i = 1; i < countCondition; i++)
-            {
-                // Check to the left
-                int col = placedCol - i;
-
-                // Check for bounds and ownership, break the loop if the tile is not the player's or if we are out of bounds
-                if (col < 0 || tileBoard[col, placedRow] != player) break;
-
-                // Otherwise, increase the count and set the new farthest left index
-                count++;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= countCondition)
-            {
-                return 1;
-            }
-
-            return 0;
-        }
-
-        private int CheckVerticalScore(int[,] tileBoard, int placedCol, int placedRow, int player, int countCondition)
-        {
-            // Start the count at 1 because we know the last placed tile is the player's
-            int count = 1;
-
-            // Start the for loop at 1 because we know the last placed tile is the player's
-            for (int i = 1; i < countCondition; i++)
-            {
-                // Check upwards
-                int row = placedRow + i;
-
-                // Check bounds and ownership
-                if (row >= rows || tileBoard[placedCol, row] != player) break;
-
-                count++;
-            }
-
-            for (int i = 1; i < countCondition; i++)
-            {
-                // Check downwards
-                int row = placedRow - i;
-
-                // Check bounds and ownership
-                if (row < 0 || tileBoard[placedCol, row] != player) break;
-
-                count++;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= countCondition)
-            {
-                return 1;
-            }
-
-            return 0;
-        }
-
-        private int CheckDiagonalScore(int[,] tileBoard, int placedCol, int placedRow, int player, int countCondition)
-        {
-            /* --- Check bottom left to top right --- */
-
-            // Start from 1, as we know the last place tile is the player's
-            int count = 1;
-
-            // Check the tiles to the right and above the placed tile
-            for (int i = 1; i < countCondition; i++)
-            {
-                int col = placedCol + i, row = placedRow + i;
-
-                // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
-                if (col >= columns || row >= rows || tileBoard[col, row] != player) break;
-
-                // Otherwise, we increase the count
-                count++;
-            }
-
-            // Check the tiles to the left and below the placed tile
-            for (int i = 1; i < countCondition; i++)
-            {
-                int col = placedCol - i, row = placedRow - i;
-
-                // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
-                if (col < 0 || row < 0 || tileBoard[col, row] != player) break;
-
-                // Otherwise, we increase the count   
-                count++;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= countCondition)
-            {
-                return 1;
-            }
-
-            /* --- Check top left to bottom right --- */
-
-            // Reset the count
-            count = 1;
-
-            // Check the tiles to the left above the placed tile
-            for (int i = 1; i < countCondition; i++)
-            {
-                int col = placedCol - i, row = placedRow + i;
-
-                if (col < 0 || row >= rows || tileBoard[col, row] != player) break;
-
-                count++;
-            }
-
-            // Check the tiles to the right and below the placed tile 
-            for (int i = 1; i < countCondition; i++)
-            {
-                int col = placedCol + i, row = placedRow - i;
-
-                if (col >= columns || row < 0 || tileBoard[col, row] != player) break;
-
-                count++;
-            }
-
-            if (count >= countCondition)
-            {
-                return 1;
-            }
-
-            return 0;
-        }
-
-        /// <summary>
         /// Checks for a victory in the game board by checking for 4 tiles in a row horizontally, vertically, or diagonally
         /// </summary>
         private bool CheckVictory(int[,] tileBoard, int placedCol, int placedRow, int player)
         {
-            if (CheckHorizontal(tileBoard, placedCol, placedRow, player)) return true;
-
-            else if (CheckVertical(tileBoard, placedCol, placedRow, player)) return true;
-
-            else if (CheckDiagonal(tileBoard, placedCol, placedRow, player)) return true;
-
-            else return false;
-        }
-
-        private bool CheckHorizontal(int[,] tileBoard, int placedCol, int placedRow, int player)
-        {
-            int count = 1;
-
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check to the right
-                int col = placedCol + i;
-
-                // Check for bounds and ownership, break the loop if the tile is not the player's or if we are out of bounds
-                if (col >= columns || tileBoard[col, placedRow] != player) break;
-
-                // Otherwise, increase the count and set the new farthest right index
-                count++;
-            }
-
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check to the left
-                int col = placedCol - i;
-
-                // Check for bounds and ownership, break the loop if the tile is not the player's or if we are out of bounds
-                if (col < 0 || tileBoard[col, placedRow] != player) break;
-
-                // Otherwise, increase the count and set the new farthest left index
-                count++;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= tilesToWin)
+            var resultHor = TilePatternCheck.CheckHorizontal(tileBoard, placedCol, placedRow, player);
+            if (resultHor.isMatch)
             {
                 return true;
             }
 
-            return false;
-        }
-
-        private bool CheckVertical(int[,] tileBoard, int placedCol, int placedRow, int player)
-        {
-            // Start the count at 1 because we know the last placed tile is the player's
-            int count = 1;
-
-            // Start the for loop at 1 because we know the last placed tile is the player's
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check upwards
-                int row = placedRow + i;
-
-                // Check bounds and ownership
-                if (row >= rows || tileBoard[placedCol, row] != player) break;
-
-                count++;
-            }
-
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check downwards
-                int row = placedRow - i;
-
-                // Check bounds and ownership
-                if (row < 0 || tileBoard[placedCol, row] != player) break;
-
-                count++;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= tilesToWin)
+            var resultVert = TilePatternCheck.CheckVertical(tileBoard, placedCol, placedRow, player);
+            if (resultVert.isMatch)
             {
                 return true;
             }
 
-            return false;
-        }
-
-        /// <summary>
-        /// Check both diagonal directions from a given spot and return true if a connection of 4 is made in any one direction
-        /// </summary>
-        /// <param name="placedCol"></param>
-        /// <param name="placedRow"></param>
-        /// <param name="player"></param>
-        /// <returns></returns>
-        private bool CheckDiagonal(int[,] tileBoard, int placedCol, int placedRow, int player)
-        {
-            /* --- Check bottom left to top right --- */
-
-            // Start from 1, as we know the last place tile is the player's
-            int count = 1;
-
-            // Check the tiles to the right and above the placed tile
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol + i, row = placedRow + i;
-
-                // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
-                if (col >= columns || row >= rows || tileBoard[col, row] != player) break;
-
-                // Otherwise, we increase the count
-                count++;
-            }
-
-            // Check the tiles to the left and below the placed tile
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol - i, row = placedRow - i;
-
-                // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
-                if (col < 0 || row < 0 || tileBoard[col, row] != player) break;
-
-                // Otherwise, we increase the count   
-                count++;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= tilesToWin)
-            {
-                return true;
-            }
-
-            /* --- Check top left to bottom right --- */
-
-            // Reset the count
-            count = 1;
-
-            // Check the tiles to the left above the placed tile
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol - i, row = placedRow + i;
-
-                if (col < 0 || row >= rows || tileBoard[col, row] != player) break;
-
-                count++;
-            }
-
-            // Check the tiles to the right and below the placed tile 
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol + i, row = placedRow - i;
-
-                if (col >= columns || row < 0 || tileBoard[col, row] != player) break;
-
-                count++;
-            }
-
-            if (count >= tilesToWin)
+            var resultDiag = TilePatternCheck.CheckDiagonal(tileBoard, placedCol, placedRow, player);
+            if (resultDiag.isMatch)
             {
                 return true;
             }

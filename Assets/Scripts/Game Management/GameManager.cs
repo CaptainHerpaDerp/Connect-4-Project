@@ -3,13 +3,13 @@ using UnityEngine;
 using GameElements;
 using Utilities;
 using Core;
-using UIManagement;
-using System;
 using VisualElements;
 using AI;
 
 namespace Management
 {
+    public enum GameState { MainMenu, PlayerTurn, RoundOver, GameOver }
+
     public class GameManager : Singleton<GameManager>
     {
         #region Serialized Fields
@@ -49,8 +49,6 @@ namespace Management
 
         // Either 1 or 2
         private int playerTurn = 1;
-        private bool visualizeTilePiece = true;
-        private bool isRoundOver = false;
 
         // The tile piece that will be placed on the board
         private PlacementPiece previewPlacementPiece;
@@ -63,13 +61,19 @@ namespace Management
 
         // Singletons
         private EventBus eventBus;
-        private GamePrefs gamePrefs;
         private AIPlayer aiPlayer;
 
+        // Game State
+        [ShowInInspector] private GameState gameState = GameState.MainMenu;
+
+        // Game State Getters
+        private bool isRoundOver => gameState == GameState.RoundOver;
+        private bool isGameActive => (gameState != GameState.MainMenu && gameState != GameState.GameOver);
+
         // Game Prefs Getters
-        private int rows => gamePrefs.Rows;
-        private int columns => gamePrefs.Columns;
-        private int tilesToWin => gamePrefs.TilesToWin;
+        private int rows => GamePrefs.Rows;
+        private int columns => GamePrefs.Columns;
+        private int tilesToWin => GamePrefs.TilesToWin;
 
         #region Initialization
 
@@ -77,7 +81,6 @@ namespace Management
         {
             // Singleton initialization
             eventBus = EventBus.Instance;
-            gamePrefs = GamePrefs.Instance;
             aiPlayer = AIPlayer.Instance;
 
             if (rows == 0 || columns == 0)
@@ -92,11 +95,24 @@ namespace Management
                 return;
             }
 
-            previewPlacementPiece = Instantiate(placementPiecePrefab, Vector3.zero, Quaternion.identity);
+            previewPlacementPiece = Instantiate(placementPiecePrefab, new Vector2(1000, 1000), Quaternion.identity);
 
             gameBoard.Initialize(columns);
 
             InitializeTileBoardEven();
+
+            // Default the player turn to 1
+            eventBus.Publish<int>("OnPlayerTurnChanged", playerTurn);
+
+            eventBus.Subscribe<bool>("OnGameStart", (aiEnabled) =>
+            {
+                gameState = GameState.PlayerTurn;
+
+                if (aiEnabled)
+                {
+                    isAIEnabled = true;
+                }           
+            });
         }
 
         /// <summary>
@@ -176,38 +192,10 @@ namespace Management
 
         private void Update()
         {
-            DoPlayerTurns();
-        }
-
-        private void FixedUpdate()
-        {
-            // Visualize the piece that will be placed on the board
-
-            if (visualizeTilePiece)
+            if (isGameActive)
             {
-                if (isAIEnabled && playerTurn == 2)
-                {
-                    // Do not visualize the tile piece if the AI is enabled and it is the AI's turn
-                    previewPlacementPiece.transform.position = new Vector2(1000, 1000);
-                    return;
-                }
-
-                int colNumber = gameBoard.GetSelectedColumnNumber();
-                // Clamp the column number to be within the bounds of the board
-                if (colNumber == -1)
-                {
-                    previewPlacementPiece.transform.position = new Vector2(1000, 1000);
-                    return;
-                }
-
-                // To get the last item in an array, we subtract 1 from the length or we can use the ^ operator
-
-                // get the last row in the column
-                int row = rows - 1;
-
-                previewPlacementPiece.transform.position = GetDropPointPosition(colNumber);
-
-                previewPlacementPiece.SetColour(gamePrefs.GetPlayerColour(playerTurn));
+                DoPlayerTurns();
+                DoTilePieceVisualization();
             }
         }
 
@@ -227,7 +215,7 @@ namespace Management
 
         private void DoPlayerTurns()
         {
-            if (isOnPlaceCooldown)
+            if (isRoundOver || isOnPlaceCooldown)
             {
                 return;
             }
@@ -278,7 +266,7 @@ namespace Management
                     placedPieces[colNumber, row] = newTilePiece;
 
                     // Instantiate the new tile piece
-                    newTilePiece.SetColour(gamePrefs.GetPlayerColour(playerNumber));
+                    newTilePiece.SetColour(GamePrefs.GetPlayerColour(playerNumber));
                     newTilePiece.transform.localScale = tileScale;
 
                     newTilePiece.Hide();
@@ -287,7 +275,7 @@ namespace Management
                     Vector2 dropPoint = GetDropPointPosition(colNumber);
 
                     // Drop the tile piece from the top of the board to the placed position
-                    newDroppingTilePiece.DropToPosition(dropPoint, newTilePiece.transform.position, gamePrefs.GetPlayerColour(playerNumber));
+                    newDroppingTilePiece.DropToPosition(dropPoint, newTilePiece.transform.position, GamePrefs.GetPlayerColour(playerNumber));
 
                     isDropping = true;
                     CheckVictory(colNumber, row, playerNumber);
@@ -321,16 +309,34 @@ namespace Management
         /// </summary>
         private void CheckVictory(int placedCol, int placedRow, int player)
         {
-            if (CheckHorizontal(placedCol, placedRow, player)) return;
+            (bool isMatchHor, int leftColIndex, int rightColIndex) = TilePatternCheck.CheckHorizontal(tileBoard, placedCol, placedRow, player);
+            if (isMatchHor)
+            {
+                DrawLineRenderer(tileObjects[leftColIndex, placedRow].transform.position, tileObjects[rightColIndex, placedRow].transform.position);
+                EndRound(player);
+                return;
+            }
 
-            else if (CheckVertical(placedCol, placedRow, player)) return;
+            (bool isMatchVert, int topRowIndex, int bottomRowIndex) = TilePatternCheck.CheckVertical(tileBoard, placedCol, placedRow, player);
+            if (isMatchVert)
+            {
+                DrawLineRenderer(tileObjects[placedCol, bottomRowIndex].transform.position, tileObjects[placedCol, topRowIndex].transform.position);
+                EndRound(player);
+                return;
+            }
 
-            else CheckDiagonal(placedCol, placedRow, player);
+            (bool isMatchDiag, Vector2 indice1, Vector2 indice2) = TilePatternCheck.CheckDiagonal(tileBoard, placedCol, placedRow, player);
+            if (isMatchDiag)
+            {
+                DrawLineRenderer(tileObjects[(int)indice1.x, (int)indice1.y].transform.position, tileObjects[(int)indice2.x, (int)indice2.y].transform.position);
+                EndRound(player);
+                return;
+            }
         }
 
         private void EndRound(int winner)
         {
-            isRoundOver = true;
+            gameState = GameState.RoundOver;
 
             StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isDropping, () =>
             {
@@ -341,7 +347,7 @@ namespace Management
                 StartCoroutine(Utils.WaitDurationAndExecuteCR(connectionShowDuration, () =>
                 {
                     ResetPlacedPieces();
-                    isRoundOver = false;
+                    gameState = GameState.PlayerTurn;
                 }));
 
                 if (winner == 1)
@@ -378,202 +384,7 @@ namespace Management
         }
 
         #endregion
-
-        #region Line Check Methods
-        private bool CheckHorizontal(int placedCol, int placedRow, int player)
-        {
-            int count = 1;
-
-            // Tracked the farthest left and right line points
-            int leftColIndex = placedCol, rightColIndex = placedCol;
-
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check to the right
-                int col = placedCol + i;
-
-                // Check for bounds and ownership, break the loop if the tile is not the player's or if we are out of bounds
-                if (col >= columns || tileBoard[col, placedRow] != player) break;
-
-                // Otherwise, increase the count and set the new farthest right index
-                count++;
-                leftColIndex = col;
-            }
-
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check to the left
-                int col = placedCol - i;
-
-                // Check for bounds and ownership, break the loop if the tile is not the player's or if we are out of bounds
-                if (col < 0 || tileBoard[col, placedRow] != player) break;
-
-                // Otherwise, increase the count and set the new farthest left index
-                count++;
-                rightColIndex = col;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= tilesToWin)
-            {
-                DrawLineRenderer(tileObjects[leftColIndex, placedRow].transform.position, tileObjects[rightColIndex, placedRow].transform.position);
-                EndRound(player);
-                return true;
-            }
-
-            return false;
-        }
-
-        private bool CheckVertical(int placedCol, int placedRow, int player)
-        {
-            // Start the count at 1 because we know the last placed tile is the player's
-            int count = 1;
-
-            /*Track the top and bottom indices of the line
-             (top and bottom are set to the placed row initially, in case the placed tile becomes the top or bottom of the line)*/
-            int topRowIndex = placedRow, bottomRowIndex = placedRow;
-
-            // Start the for loop at 1 because we know the last placed tile is the player's
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check upwards
-                int row = placedRow + i;
-
-                // Check bounds and ownership
-                if (row >= rows || tileBoard[placedCol, row] != player) break;
-
-                count++;
-
-                topRowIndex = row;
-            }
-
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                // Check downwards
-                int row = placedRow - i;
-
-                // Check bounds and ownership
-                if (row < 0 || tileBoard[placedCol, row] != player) break;
-
-                count++;
-
-                bottomRowIndex = row;
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= tilesToWin)
-            {
-                DrawLineRenderer(tileObjects[placedCol, bottomRowIndex].transform.position, tileObjects[placedCol, topRowIndex].transform.position);
-                EndRound(player);
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Check both diagonal directions from a given spot and return true if a connection of 4 is made in any one direction
-        /// </summary>
-        /// <param name="placedCol"></param>
-        /// <param name="placedRow"></param>
-        /// <param name="player"></param>
-        /// <returns></returns>
-        private bool CheckDiagonal(int placedCol, int placedRow, int player)
-        {
-            /* --- Check bottom left to top right --- */
-
-            // Start from 1, as we know the last place tile is the player's
-            int count = 1;
-
-            /* 
-             * To draw the check line, we need to track the corners of the valid spots
-             * Initially, we set both points to the position of the placed tile.
-             */
-            Vector2 trIndex = new(placedCol, placedRow);
-            Vector2 blIndex = new(placedCol, placedRow);
-
-            // Check the tiles to the right and above the placed tile
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol + i, row = placedRow + i;
-
-                // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
-                if (col >= columns || row >= rows || tileBoard[col, row] != player) break;
- 
-                // Otherwise, we increase the count
-                count++;               
-
-                // Set this position as the new farthest spot to the top right
-                trIndex = new(col, row);
-            }
-
-            // Check the tiles to the left and below the placed tile
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol - i, row = placedRow - i;
-
-                // If we are out of bounds, or the tile is not the player's, we break the count 'streak'
-                if (col < 0 || row < 0 || tileBoard[col, row] != player) break;
-            
-                // Otherwise, we increase the count   
-                count++;         
-                
-                // Set this positio as the new farthest spot to the bottom left
-                blIndex = new(col, row);
-            }
-
-            // Check if the count matches the required tiles
-            if (count >= tilesToWin)
-            {
-                DrawLineRenderer(tileObjects[(int)blIndex.x, (int)blIndex.y].transform.position, tileObjects[(int)trIndex.x, (int)trIndex.y].transform.position);
-                EndRound(player);
-                return true;
-            }
-
-            /* --- Check top left to bottom right --- */
-
-            // Reset the count
-            count = 1;
-
-            Vector2 tlIndex = new(placedCol, placedRow);
-            Vector2 brIndex = new(placedCol, placedRow);
-
-           // Check the tiles to the left above the placed tile
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol - i, row = placedRow + i;
-
-                if (col < 0 || row >= rows || tileBoard[col, row] != player) break;
-
-                count++;
-
-                tlIndex = new(col, row);
-            }
-
-            // Check the tiles to the right and below the placed tile 
-            for (int i = 1; i < tilesToWin; i++)
-            {
-                int col = placedCol + i, row = placedRow - i;
-
-                if (col >= columns || row < 0 || tileBoard[col, row] != player) break;
-
-                count++;
-
-                brIndex = new(col, row);
-            }
-
-            if (count >= tilesToWin)
-            {
-                DrawLineRenderer(tileObjects[(int)tlIndex.x, (int)tlIndex.y].transform.position, tileObjects[(int)brIndex.x, (int)brIndex.y].transform.position);
-                EndRound(player);
-                return true;
-            }
-
-            return false;
-        }
-
-        #endregion
-
+      
         #region Utility Methods
 
         /// <summary>
@@ -593,6 +404,31 @@ namespace Management
 
 
         #endregion
+
+        /// <summary>
+        /// Show the tile piece that will be placed on the board
+        /// </summary>
+        private void DoTilePieceVisualization()
+        {
+            if (isAIEnabled && playerTurn == 2)
+            {
+                // Do not visualize the tile piece if the AI is enabled and it is the AI's turn
+                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+                return;
+            }
+
+            int colNumber = gameBoard.GetSelectedColumnNumber();
+            // Clamp the column number to be within the bounds of the board
+            if (colNumber == -1)
+            {
+                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+                return;
+            }
+
+            previewPlacementPiece.transform.position = GetDropPointPosition(colNumber);
+
+            previewPlacementPiece.SetColour(GamePrefs.GetPlayerColour(playerTurn));
+        }
 
         public void ToggleAI()
         {

@@ -11,19 +11,17 @@ namespace UIManagement
 
         // Singleton References
         private EventBus eventBus;
-        private GamePrefs gamePrefs;
 
         private void Start()
         {
             eventBus = EventBus.Instance;
-            gamePrefs = GamePrefs.Instance;
 
             eventBus.Subscribe<int>("RoundOver", SetPlayerScore);
 
             // Assign the player colours
 
-            player1ScoreBannerGroup.Instantiate(gamePrefs.GetPlayerColour(1), gamePrefs.ScoreToWin);
-            player2ScoreBannerGroup.Instantiate(gamePrefs.GetPlayerColour(2), gamePrefs.ScoreToWin);
+            player1ScoreBannerGroup.Instantiate(GamePrefs.GetPlayerColour(1), GamePrefs.ScoreToWin);
+            player2ScoreBannerGroup.Instantiate(GamePrefs.GetPlayerColour(2), GamePrefs.ScoreToWin);
         }
 
         public void SetPlayerScore(int playerNumber)

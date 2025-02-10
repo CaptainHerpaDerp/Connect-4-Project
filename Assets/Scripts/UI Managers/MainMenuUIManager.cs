@@ -9,7 +9,7 @@ namespace UIManagement
     /// <summary>
     /// Manages button interaction and gameplay initiation in the main menu.
     /// </summary>
-    public class MainMenuUIManager : MonoBehaviour
+    public class MainMenuUIManager : Singleton<MainMenuUIManager>   
     {
         [BoxGroup("Component References"), SerializeField] private CameraController cameraController;
 
@@ -61,6 +61,17 @@ namespace UIManagement
 
                 cameraController.SetCameraStartPosition();
             }
+            else
+            {
+                mainMenuCanvasGroup.alpha = 0;
+                mainMenuCanvasGroup.interactable = false;
+                mainMenuCanvasGroup.blocksRaycasts = false;
+
+                ShowGameMenu();
+
+                // Publish the game start event, with the CPU flag set to false
+                eventBus.Publish<bool>("OnGameStart", false);
+            }
         }
 
         private void DoButtonSubscriptions()
@@ -68,6 +79,18 @@ namespace UIManagement
             play1v1Button.onClick.AddListener(StartGame1v1);
             playVsCPUButton.onClick.AddListener(StartGameVsCPU);
             quitButton.onClick.AddListener(QuitGame);
+        }
+
+
+        public void ReturnToMainMenu()
+        {
+            // Fade the game group out
+            StartCoroutine(Utils.FadeOutCanvasGroup(gameMenuCanvasGroup, 0.25f));
+
+            cameraController.MoveCameraUp(onPositionReached: () =>
+            {
+                ShowMainMenu();
+            });
         }
 
         #region Button Action Methods
@@ -115,6 +138,11 @@ namespace UIManagement
             mainMenuCanvasGroup.blocksRaycasts = false;
 
             StartCoroutine(Utils.FadeOutCanvasGroup(mainMenuCanvasGroup, 0.5f));          
+        }
+
+        private void ShowMainMenu()
+        {
+            StartCoroutine(Utils.FadeInCanvasGroup(mainMenuCanvasGroup, 0.25f));
         }
 
         private void ShowGameMenu()

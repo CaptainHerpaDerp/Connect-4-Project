@@ -18,6 +18,8 @@ namespace UIManagement
 
             eventBus.Subscribe<int>("RoundOver", SetPlayerScore);
 
+            eventBus.Subscribe("OnGameRestart", ResetScores);
+
             // Assign the player colours
 
             player1ScoreBannerGroup.Instantiate(GamePrefs.GetPlayerColour(1), GamePrefs.ScoreToWin);
@@ -35,6 +37,12 @@ namespace UIManagement
                     player2ScoreBannerGroup.AddPlayerScore();
                     break;
             }
+        }
+
+        public void ResetScores()
+        {
+            player1ScoreBannerGroup.ResetPlayerScore();
+            player2ScoreBannerGroup.ResetPlayerScore();
         }
     }
 }

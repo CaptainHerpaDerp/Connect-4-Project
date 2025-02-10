@@ -3,6 +3,9 @@ using Core;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using Utilities;
+using System.Threading.Tasks;
+using System;
+
 namespace AI
 {
     public enum AIDifficulty
@@ -25,6 +28,8 @@ namespace AI
         [BoxGroup("AI Evaluation/AI"), SerializeField] private int aiThreeEval = 5;
         [BoxGroup("AI Evaluation/AI"), SerializeField] private int aiTwoEval = 2;
 
+        [BoxGroup("AI Settings"), SerializeField] private bool useAIV2 = false;
+
         // Define some constant values to make the code more readable
         const int EMPTY = GamePrefs.EMPTY;
         const int OPPONENT = GamePrefs.OPPONENT;
@@ -35,6 +40,13 @@ namespace AI
         private int columns => GamePrefs.Columns;
         private int tilesToWin => GamePrefs.TilesToWin;
 
+        public async void GetMoveAsync(int[,] gameBoard, Action<int> callback)
+        {
+            int bestColumn = await Task.Run(() => GetMove(gameBoard));
+
+            callback(bestColumn);
+        }
+
         public int GetMove(int[,] gameBoard)
         {
             highestBudget = 0;
@@ -43,9 +55,6 @@ namespace AI
             int bestColumn = -1;
 
             List<int> validMoves = GetValidDropPoints(gameBoard);
-            //Debug.Log($"Valid moves: {string.Join(", ", validMoves)}");
-
-            List<int> scores = new List<int>();
 
             foreach (int colDropIndex in validMoves)
             {
@@ -62,8 +71,6 @@ namespace AI
  
                 // Evaluate this move using Minimax       // Difficulty represents search depth
                 int score = MinMax(newBoard, colDropIndex, rowIndex, (int)aiDifficulty, int.MinValue, int.MaxValue, false);
-
-                scores.Add(score);
 
                 // Update offensive score
                 if (score > bestScore)
@@ -129,7 +136,17 @@ namespace AI
             // First check if the game is already over
             if (depth == 0 || CheckVictory(tileBoard, placedCol, placedRow, AI_PLAYER) || CheckVictory(tileBoard, placedCol, placedRow, OPPONENT))
             {
-                int score = EvaluateBoard(tileBoard, placedCol, placedRow, depth);
+                int score = 0;
+
+                if (useAIV2)
+                {
+                     score = EvaluateBoard2(tileBoard, depth);
+                }
+                else
+                {
+                    score = EvaluateBoard(tileBoard, placedCol, placedRow, depth);
+                }
+
                 //Debug.Log($"Score: {score}");
                 return score;
             }
@@ -230,9 +247,9 @@ namespace AI
             return (newBoard, row);
         }
 
-        #region Victory Check
+        #region Evaluation
 
-        int EvaluateBoard(int[,] tileBoard, int placedCol, int placedRow, int depth)
+        private int EvaluateBoard(int[,] tileBoard, int placedCol, int placedRow, int depth)
         {
             // Check for immediate opponent win
             if (OpponentCanWinNextMove(tileBoard))
@@ -288,6 +305,135 @@ namespace AI
 
             return score;
         }
+
+        private int EvaluateBoard2(int[,] board, int depth)
+        {
+            // Check for immediate opponent win
+            if (OpponentCanWinNextMove(board))
+            {
+                return -10000; // Arbitrary huge penalty
+            }
+
+            int score = 0;
+
+            for (int col = 0; col <= columns - tilesToWin; col++)
+            {
+                for (int row = 0; row < rows; row++)
+                {
+                    int[] window = GetWindow(board, col, row, 1, 0);
+                    score += EvaluateWindow(window, depth);
+                }
+            }
+
+            // Evaluate vertical windows
+            for (int col = 0; col < columns; col++)
+            {
+                for (int row = 0; row <= rows - tilesToWin; row++)
+                {
+                    int[] window = GetWindow(board, col, row, 0, 1);
+                    score += EvaluateWindow(window, depth);
+                }
+            }
+
+            // Evaluate diagonal windows (bottom left to top right)
+            for (int col = 0; col <= columns - tilesToWin; col++)
+            {
+                for (int row = 0; row <= rows - tilesToWin; row++)
+                {
+                    int[] window = GetWindow(board, col, row, 1, 1);
+                    score += EvaluateWindow(window, depth);
+                }
+            }
+
+            // Evaluate diagonal windows (top left to bottom right)
+            for (int col = 0; col <= columns - tilesToWin; col++)
+            {
+                for (int row = tilesToWin - 1; row < rows; row++)
+                {
+                    int[] window = GetWindow(board, col, row, 1, -1);
+                    score += EvaluateWindow(window, depth);
+                }
+            }
+
+            return score;
+        }
+
+        private int EvaluateWindow(int[] window, int depth)
+        {
+            int score = 0;
+            int emptyCount = 0;
+            int playerCount = 0;
+            int opponentCount = 0;
+
+            foreach (int tile in window)
+            {
+                if (tile == AI_PLAYER)
+                {
+                    playerCount += 1;
+                }
+                else if (tile == OPPONENT)
+                {
+                    opponentCount += 1;
+                }
+                else
+                {
+                    emptyCount += 1;
+                }
+            }
+            
+            if (playerCount > 0 && opponentCount > 0)
+            {
+                return 0;
+            }
+
+            if (playerCount == 4)
+            {
+                score += aiWinEval + depth;
+            }
+            else if (playerCount == 3 && emptyCount == 1)
+            {
+                score += aiThreeEval + depth;
+            }
+            else if (playerCount == 2 && emptyCount == 2)
+            {
+                score += aiTwoEval + depth;
+            }
+
+            if (opponentCount == 4)
+            {
+                score -= playerWinEval - depth;
+            }
+            else if (opponentCount == 3 && emptyCount == 1)
+            {
+                score -= playerThreeEval - depth;
+            }
+            else if (opponentCount == 2 && emptyCount == 2)
+            {
+                score -= playerTwoEval - depth;
+            }
+
+            return score;
+        }
+
+        /// <summary>
+        /// Extract a window of tiles from the game board with the given start column and row, and the direction to move in
+        /// </summary>
+        private int[] GetWindow(int[,] board, int startCol, int startRow, int colDir, int rowDir)
+        {
+            // The size of the window only needs to be the size of the tiles to win
+            int[] window = new int[tilesToWin];
+
+            for (int i = 0; i < tilesToWin; i++)
+            {
+                window[i] = board[startCol + i * colDir, startRow + i * rowDir];
+            }
+
+            return window;
+        }
+
+        #endregion
+
+        #region Victory Check
 
         // Helper function that simulates all opponent moves
         private bool OpponentCanWinNextMove(int[,] board)

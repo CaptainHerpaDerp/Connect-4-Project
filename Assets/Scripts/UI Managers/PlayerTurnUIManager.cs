@@ -22,11 +22,15 @@ namespace UIManagement {
             eventBus.Subscribe<int>("OnPlayerTurnChanged", SetPlayerTurnPanel);
 
             eventBus.Subscribe<bool>("OnGameStart", SetPlayerFrames);
+
+            eventBus.Subscribe<int>("GameOver", SetPlayerWinnder);
+
+            eventBus.Subscribe("OnGameRestart", ResetPlayerFrames);
         }
 
         private void SetPlayerFrames(bool isAIEnabled)
         {
-            player1TurnPanel.SetActive(true);
+            player1TurnPanel.SetVisibility(true);
 
             // Depending on whether the AI is enabled or not, show the appropriate turn panel
             if (isAIEnabled)
@@ -44,25 +48,44 @@ namespace UIManagement {
                 activePlayer2TurnPanel = player2TurnPanel;
             }
 
-            activePlayer2TurnPanel.SetActive(false);
+            activePlayer2TurnPanel.SetVisibility(false);
+        }
+
+        private void ResetPlayerFrames()
+        {
+            player1TurnPanel.ResetText();
+            activePlayer2TurnPanel.ResetText();
+
+            player1TurnPanel.SetVisibility(true);
+            activePlayer2TurnPanel.SetVisibility(false);
         }
 
         private void SetPlayerTurnPanel(int playerIndex)
         {
             if (playerIndex == 1)
             {
-                player1TurnPanel.SetActive(true);
-                activePlayer2TurnPanel.SetActive(false);
+                player1TurnPanel.SetVisibility(true);
+                activePlayer2TurnPanel.SetVisibility(false);
             }
             else if (playerIndex == 2)
             {
-                player1TurnPanel.SetActive(false);
-                activePlayer2TurnPanel.SetActive(true);
+                player1TurnPanel.SetVisibility(false);
+                activePlayer2TurnPanel.SetVisibility(true);
             }
             else
             {
                 Debug.LogError("PlayerTurnUIManager: Invalid player index!");
             }
+        }
+
+        private void SetPlayerWinnder(int winner)
+        {
+            PlayerTurnPanel winnerPanel = winner == 1 ? player1TurnPanel : activePlayer2TurnPanel;
+            PlayerTurnPanel loserPanel = winner == 1 ? activePlayer2TurnPanel : player1TurnPanel;
+
+            winnerPanel.SetWinner();
+
+            loserPanel.Hide();
         }
     }
 }

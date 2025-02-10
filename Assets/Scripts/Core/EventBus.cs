@@ -12,6 +12,19 @@ namespace Core
         private Dictionary<string, Delegate> eventHandlers = new Dictionary<string, Delegate>();
 
         /// <summary>
+        /// Subscribe to an event with no parameters.
+        /// </summary>
+        public void Subscribe(string eventName, Action handler)
+        {
+            if (!eventHandlers.ContainsKey(eventName))
+            {
+                eventHandlers[eventName] = null;
+            }
+
+            eventHandlers[eventName] = Delegate.Combine(eventHandlers[eventName], handler);
+        }
+
+        /// <summary>
         /// Subscribe to an event with a single parameter.
         /// </summary>
         public void Subscribe<T>(string eventName, Action<T> handler)
@@ -41,19 +54,6 @@ namespace Core
         /// Subscribe to an event with three parameters.
         /// </summary>
         public void Subscribe<T1, T2, T3>(string eventName, Action<T1, T2, T3> handler)
-        {
-            if (!eventHandlers.ContainsKey(eventName))
-            {
-                eventHandlers[eventName] = null;
-            }
-
-            eventHandlers[eventName] = Delegate.Combine(eventHandlers[eventName], handler);
-        }
-
-        /// <summary>
-        /// Subscribe to an event with no parameters.
-        /// </summary>
-        public void Subscribe(string eventName, Action handler)
         {
             if (!eventHandlers.ContainsKey(eventName))
             {

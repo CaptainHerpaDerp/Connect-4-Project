@@ -28,6 +28,9 @@ namespace Management
         [Header("The duration of time a match will be shown before the round is reset")]
         [BoxGroup("Visual Settings"), SerializeField] private float connectionShowDuration = 0.5f;
 
+        [Header("The modification of tile piece scale by the tile scale")]
+        [BoxGroup("Visual Settings"), SerializeField] private float pieceScaleMod = 1;
+
         [Header("The minimum wait duration before another tile can be placed")]
         [BoxGroup("Placement Settings"), SerializeField] private float minPlaceWaitTime = 0.5f;
 
@@ -37,6 +40,7 @@ namespace Management
 
         private Vector2 boardCornerPosition;
         private Vector2 tileScale;
+        private Vector2 tilePieceScale;
 
         // Represents the ownership of each tile on the board
         private int[,] tileBoard;
@@ -48,7 +52,10 @@ namespace Management
         private PlacementPiece[,] placedPieces;
 
         // Either 1 or 2
-        private int playerTurn = 1;
+        private int playerTurn;
+
+        // Score of each player
+        private int player1Score = 0, player2Score = 0;
 
         // The tile piece that will be placed on the board
         private PlacementPiece previewPlacementPiece;
@@ -59,12 +66,14 @@ namespace Management
         // Tile Waiting
         private bool isOnPlaceCooldown = false;
 
+        [SerializeField] private bool aiPlaced = false;
+
         // Singletons
         private EventBus eventBus;
         private AIPlayer aiPlayer;
 
         // Game State
-        [ShowInInspector] private GameState gameState = GameState.MainMenu;
+        [SerializeField] private GameState gameState = GameState.MainMenu;
 
         // Game State Getters
         private bool isRoundOver => gameState == GameState.RoundOver;
@@ -74,6 +83,9 @@ namespace Management
         private int rows => GamePrefs.Rows;
         private int columns => GamePrefs.Columns;
         private int tilesToWin => GamePrefs.TilesToWin;
+
+        [SerializeField] private bool debugAIMove = false;
+        [SerializeField] private bool useAIV21v1 = false;
 
         #region Initialization
 
@@ -94,8 +106,12 @@ namespace Management
                 Debug.LogError("Error initializing tile board: tile space prefab is not set!");
                 return;
             }
-
+        
+            // Create the preview tile piece
             previewPlacementPiece = Instantiate(placementPiecePrefab, new Vector2(1000, 1000), Quaternion.identity);
+
+            // Blue player goes first as the start of each game
+            SetPlayerTurn(1);
 
             gameBoard.Initialize(columns);
 
@@ -112,6 +128,13 @@ namespace Management
                 {
                     isAIEnabled = true;
                 }           
+            });
+
+            eventBus.Subscribe("OnGameRestart", RestartGame);
+
+            eventBus.Subscribe("OnReturnMenu", () =>
+            {
+                gameState = GameState.MainMenu;
             });
         }
 
@@ -162,9 +185,11 @@ namespace Management
             float spacingY = (tilePlacementAreaTransform.transform.localScale.y / rows);
             tileScale = new Vector3(spacingX, spacingY, 1f);
 
+            tilePieceScale = tileScale * pieceScaleMod;
+
             // Set the scale of the preview tile piece and the dropping tile piece
-            previewPlacementPiece.transform.localScale = tileScale;
-            droppingTilePiece.transform.localScale = tileScale;
+            previewPlacementPiece.transform.localScale = tilePieceScale;
+            droppingTilePiece.transform.localScale = tilePieceScale;
 
             for (int x = 0; x < columns; x++)
             {
@@ -194,8 +219,22 @@ namespace Management
         {
             if (isGameActive)
             {
-                DoPlayerTurns();
-                DoTilePieceVisualization();
+                if (debugAIMove)
+                {
+                    DoAIVS();
+                }
+                else
+                {
+                    DoPlayerTurns();
+                    DoTilePieceVisualization();
+                }
+            }
+
+            // Debugging purposes
+            if (Input.GetKeyDown(KeyCode.W))
+            {
+                player1Score = 3;
+                CheckGameEnd();
             }
         }
 
@@ -213,30 +252,77 @@ namespace Management
             }));
         }
 
+        // Have the AI compete against itself in a 1v1 match
+        private void DoAIVS()
+        {
+            if (isAIEnabled && !isRoundOver && !aiPlaced)
+            {
+                if (playerTurn == 1)
+                {
+                    aiPlayer.GetMoveAsync(tileBoard, (bestMove) =>
+                    {
+                        // Wait until the tile placement is off cooldown before placing the tile
+                        StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isOnPlaceCooldown, () =>
+                        {
+                            PlaceTileOnColumn(bestMove, playerTurn);
+                        }));
+                    });
+                }
+                else
+                {
+                    aiPlayer.GetMoveAsync(tileBoard, (bestMove) =>
+                    {
+                        // Wait until the tile placement is off cooldown before placing the tile
+                        StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isOnPlaceCooldown, () =>
+                        {
+                            PlaceTileOnColumn(bestMove, playerTurn);
+                        }));
+                    });
+                }
+
+                aiPlaced = true;
+            }
+            else
+            {
+                if (isRoundOver)
+                {
+                    Debug.Log("Round Over");    
+                }
+                else if (aiPlaced)
+                {
+                    Debug.Log("AI Placed");
+                }
+            }
+        }
+
         private void DoPlayerTurns()
         {
-            if (isRoundOver || isOnPlaceCooldown)
+            if (isAIEnabled && !isRoundOver && !aiPlaced && playerTurn == 2)
             {
-                return;
-            }
-
-            if (isAIEnabled && playerTurn == 2)
-            {
-                PlaceTileOnColumn(aiPlayer.GetMove(tileBoard), playerTurn);
-            }
-
-            if (Input.GetMouseButtonDown(0))
-            {
-                if (!isRoundOver)
+                aiPlayer.GetMoveAsync(tileBoard, (bestMove) =>
                 {
-                    // Do not place a tile if the AI is enabled and it is the AI's turn
-                    if (isAIEnabled && playerTurn == 2)
+                    // Wait until the tile placement is off cooldown before placing the tile
+                    StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isOnPlaceCooldown, () =>
                     {
-                        return;
-                    }
+                        PlaceTileOnColumn(bestMove, playerTurn);
+                    }));
+                });
 
-                    PlaceTileOnColumn(gameBoard.GetSelectedColumnNumber(), playerTurn);
+                // Set the tile placement on cooldown so that we don't call the async method multiple times :D
+                aiPlaced = true;
+
+                //PlaceTileOnColumn(aiPlayer.GetMove(tileBoard), playerTurn);
+            }
+
+            if (Input.GetMouseButtonDown(0) && !isRoundOver && !isOnPlaceCooldown)
+            {          
+                // Do not place a tile if the AI is enabled and it is the AI's turn
+                if (isAIEnabled && playerTurn == 2)
+                {
+                    return;
                 }
+
+                PlaceTileOnColumn(gameBoard.GetSelectedColumnNumber(), playerTurn);              
             }
         }
 
@@ -267,7 +353,7 @@ namespace Management
 
                     // Instantiate the new tile piece
                     newTilePiece.SetColour(GamePrefs.GetPlayerColour(playerNumber));
-                    newTilePiece.transform.localScale = tileScale;
+                    newTilePiece.transform.localScale = tilePieceScale;
 
                     newTilePiece.Hide();
 
@@ -299,9 +385,20 @@ namespace Management
 
         private void SwitchPlayerTurn(int currentTurn)
         {
-            playerTurn = currentTurn == 1 ? 2 : 1;
+            SetPlayerTurn(currentTurn == 1 ? 2 : 1);
 
             eventBus.Publish<int>("OnPlayerTurnChanged", playerTurn);
+
+            // Reset the AI placed flag if the AI is enabled
+            if (isAIEnabled && playerTurn == 2)
+            {
+                aiPlaced = false;
+            }
+
+            if (debugAIMove)
+            {
+                aiPlaced = false;
+            }
         }
 
         /// <summary>
@@ -346,20 +443,43 @@ namespace Management
 
                 StartCoroutine(Utils.WaitDurationAndExecuteCR(connectionShowDuration, () =>
                 {
-                    ResetPlacedPieces();
-                    gameState = GameState.PlayerTurn;
+                    ResetRound();
                 }));
 
                 if (winner == 1)
                 {
                     // Publish to the event bus that the round is over, along with the winning player number
                     eventBus.Publish<int>("RoundOver", 1);
+
+                    player1Score++;
                 }
                 else if (winner == 2)
                 {
                     eventBus.Publish<int>("RoundOver", 2);
+
+                    player2Score++;
                 }
+
+                // Check if the game is won by either player
+                CheckGameEnd();
+
             }));
+        }
+
+        private void ResetRound()
+        {
+            ResetPlacedPieces();
+            gameState = GameState.PlayerTurn;
+        }
+
+        private void RestartGame()
+        {
+            ResetPlacedPieces();
+            player1Score = 0;
+            player2Score = 0;
+            gameState = GameState.PlayerTurn;
+
+            SetPlayerTurn(1);
         }
 
         private void ResetPlacedPieces()
@@ -380,6 +500,23 @@ namespace Management
             foreach (Transform child in tilePieceParentTransform)
             {
                 Destroy(child.gameObject);
+            }
+        }
+
+        /// <summary>
+        /// Check if the game has ended by checking if either player has reached the score limit
+        /// </summary>
+        private void CheckGameEnd()
+        {
+            if (player1Score >= 3 || player2Score >= 3)
+            {
+                gameState = GameState.GameOver;
+
+                eventBus.Publish<int>("GameOver", player1Score > player2Score ? 1 : 2);
+
+                // Hide the line renderer and the preview tile piece
+                lineRenderer.enabled = false;
+                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
             }
         }
 
@@ -405,6 +542,16 @@ namespace Management
 
         #endregion
 
+        private void SetPlayerTurn(int turn)
+        {
+            playerTurn = turn;
+
+            eventBus.Publish<int>("OnPlayerTurnChanged", playerTurn);
+
+            // Set the colour of the preview tile piece to the colour of the current player
+            previewPlacementPiece.SetColour(GamePrefs.GetPlayerColour(playerTurn));
+        }
+
         /// <summary>
         /// Show the tile piece that will be placed on the board
         /// </summary>
@@ -418,6 +565,7 @@ namespace Management
             }
 
             int colNumber = gameBoard.GetSelectedColumnNumber();
+
             // Clamp the column number to be within the bounds of the board
             if (colNumber == -1)
             {
@@ -426,8 +574,6 @@ namespace Management
             }
 
             previewPlacementPiece.transform.position = GetDropPointPosition(colNumber);
-
-            previewPlacementPiece.SetColour(GamePrefs.GetPlayerColour(playerTurn));
         }
 
         public void ToggleAI()

@@ -5,6 +5,9 @@ using UnityEngine;
 
 namespace UIManagement {
 
+    /// <summary>
+    /// Manages the player turn panels and their visibility, as well as their displayed text
+    /// </summary>
     public class PlayerTurnUIManager : MonoBehaviour
     {
         [BoxGroup("Turn Panels"), SerializeField] private PlayerTurnPanel player1TurnPanel, player2TurnPanel, cpuTurnPanel;

@@ -3,6 +3,9 @@ using System;
 using System.Collections;
 using UnityEngine;
 
+/// <summary>
+/// Handles camera animations and movements between the menu and game scenes.
+/// </summary>
 public class CameraController : MonoBehaviour
 {
     [BoxGroup("Movement Settings"), SerializeField] private float startY = 63f;

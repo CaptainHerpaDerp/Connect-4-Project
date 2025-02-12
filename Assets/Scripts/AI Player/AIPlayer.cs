@@ -13,6 +13,9 @@ namespace AI
         Easy = 2, Medium = 4, Hard = 6
     }
 
+    /// <summary>
+    /// Uses MinMax to determine the best move for the AI player
+    /// </summary>
     public class AIPlayer : Singleton<AIPlayer>
     {
         [BoxGroup("AI Settings"), SerializeField] private AIDifficulty aiDifficulty;

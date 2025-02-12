@@ -3,6 +3,9 @@ using UnityEngine;
 
 namespace Utilities
 {
+    /// <summary>
+    /// Static class that contains methods to check for patterns of tiles on the game board.
+    /// </summary>
     public static class TilePatternCheck
     {     
         private static int rows => GamePrefs.Rows;

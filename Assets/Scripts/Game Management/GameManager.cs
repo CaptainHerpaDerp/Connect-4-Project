@@ -10,6 +10,9 @@ namespace Management
 {
     public enum GameState { MainMenu, PlayerTurn, RoundOver, GameOver, GamePause }
 
+    /// <summary>
+    /// Manages the game flow, player turns, and game state
+    /// </summary>
     public class GameManager : Singleton<GameManager>
     {
         #region Serialized Fields
@@ -59,6 +62,8 @@ namespace Management
         // Represents the pieces that have been placed on the board
         private PlacementPiece[,] placedPieces;
 
+        private static readonly Vector2 OffscreenPosition = new Vector2(1000, 1000);
+
         // Either 1 or 2
         private int playerTurn;
 
@@ -68,12 +73,14 @@ namespace Management
         // The tile piece that will be placed on the board
         private PlacementPiece previewPlacementPiece;
 
-        private bool isDropping = false;
+        private bool isDropping;
 
         // Tile Waiting
-        private bool isOnPlaceCooldown = false;
+        private bool isOnPlaceCooldown;
 
-        private bool aiPlaced = false;
+        // AI Checks
+        private bool aiPlaced;
+        private bool isAIProcessing;
 
         // Singletons
         private EventBus eventBus;
@@ -110,7 +117,7 @@ namespace Management
                 Debug.LogError("Error initializing tile board: tile space prefab is not set!");
                 return;
             }
-        
+
             // Create the preview tile piece
             previewPlacementPiece = Instantiate(placementPiecePrefab, new Vector2(1000, 1000), Quaternion.identity);
 
@@ -126,12 +133,12 @@ namespace Management
 
             eventBus.Subscribe<bool>("OnGameStart", (aiEnabled) =>
             {
-                gameState = GameState.PlayerTurn;
+                SetGameState(GameState.PlayerTurn);
 
                 if (aiEnabled)
                 {
                     isAIEnabled = true;
-                }           
+                }
             });
 
             eventBus.Subscribe("OnGameRestart", RestartGame);
@@ -142,10 +149,10 @@ namespace Management
                 RestartGame();
 
                 // Reset the game state to the main menu
-                gameState = GameState.MainMenu;
+                SetGameState(GameState.MainMenu);
 
                 // Hide the preview tile piece
-                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+                previewPlacementPiece.transform.position = OffscreenPosition;
             });
         }
 
@@ -155,33 +162,13 @@ namespace Management
         private void InitializeTileBoardEven()
         {
             // Destroy any existing tile objects
-            if (tileObjects != null)
+            foreach (Transform child in tileParentTransform)
             {
-                for (int x = 0; x < columns; x++)
-                {
-                    for (int y = 0; y < rows; y++)
-                    {
-                        if (tileObjects[x, y] != null)
-                        {
-                            Destroy(tileObjects[x, y]);
-                        }
-                    }
-                }
+                Destroy(child.gameObject);
             }
-
-            // Destroy any existing tile pieces
-            if (placedPieces != null)
+            foreach (Transform child in tilePieceParentTransform)
             {
-                for (int x = 0; x < columns; x++)
-                {
-                    for (int y = 0; y < rows; y++)
-                    {
-                        if (placedPieces[x, y] != null)
-                        {
-                            Destroy(placedPieces[x, y]);
-                        }
-                    }
-                }
+                Destroy(child.gameObject);
             }
 
             tileBoard = new int[columns, rows];
@@ -231,7 +218,7 @@ namespace Management
             if (isGameActive)
             {
                 DoPlayerTurns();
-                DoTilePieceVisualization();               
+                DoTilePieceVisualization();
             }
 
             CheckKeys();
@@ -249,36 +236,35 @@ namespace Management
             {
                 isOnPlaceCooldown = false;
             }));
-        }  
+        }
 
         private void DoPlayerTurns()
         {
-            if (isAIEnabled && !isRoundOver && !aiPlaced && playerTurn == 2)
+            if (isAIEnabled && playerTurn == 2)
             {
-                aiPlayer.GetMoveAsync(tileBoard, (bestMove) =>
+                if (!isAIProcessing && !aiPlaced)
                 {
-                    // Wait until the tile placement is off cooldown before placing the tile
-                    StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isOnPlaceCooldown, () =>
+                    // Safety check to prevent multiple asyncs 
+                    isAIProcessing = true;
+                    aiPlayer.GetMoveAsync(tileBoard, (bestMove) =>
                     {
-                        PlaceTileOnColumn(bestMove, playerTurn);
-                    }));
-                });
+                        StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isOnPlaceCooldown, () =>
+                        {
+                            PlaceTileOnColumn(bestMove, playerTurn);
+                            isAIProcessing = false;
+                        }));
+                    });
 
-                // Set the tile placement on cooldown so that we don't call the async method multiple times :D
-                aiPlaced = true;
+                    aiPlaced = true;
+                }
 
-                //PlaceTileOnColumn(aiPlayer.GetMove(tileBoard), playerTurn);
+                // Prevent the player from doing anything while the AI is processing
+                return; 
             }
 
             if (Input.GetMouseButtonDown(0) && !isRoundOver && !isOnPlaceCooldown)
-            {          
-                // Do not place a tile if the AI is enabled and it is the AI's turn
-                if (isAIEnabled && playerTurn == 2)
-                {
-                    return;
-                }
-
-                PlaceTileOnColumn(gameBoard.GetSelectedColumnNumber(), playerTurn);              
+            {
+                PlaceTileOnColumn(gameBoard.GetSelectedColumnNumber(), playerTurn);
             }
         }
 
@@ -378,25 +364,22 @@ namespace Management
             {
                 DrawLineRenderer(tileObjects[(int)indice1.x, (int)indice1.y].transform.position, tileObjects[(int)indice2.x, (int)indice2.y].transform.position, player);
                 EndRound(player);
-                return;
             }
         }
 
         private void EndRound(int winner)
         {
-            gameState = GameState.RoundOver;
+            SetGameState(GameState.RoundOver);
 
             StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isDropping, () =>
             {
-                Debug.Log("Drop stopped");
-
                 lineRenderer.enabled = true;
 
                 StartCoroutine(Utils.WaitDurationAndExecuteCR(connectionShowDuration, () =>
                 {
                     // Reset the round if the game is still active
                     if (isGameActive)
-                    ResetRound();
+                        ResetRound();
                 }));
 
                 if (winner == 1)
@@ -422,7 +405,8 @@ namespace Management
         private void ResetRound()
         {
             ResetPlacedPieces();
-            gameState = GameState.PlayerTurn;
+
+            SetGameState(GameState.PlayerTurn);
         }
 
         private void RestartGame()
@@ -430,7 +414,7 @@ namespace Management
             ResetPlacedPieces();
             player1Score = 0;
             player2Score = 0;
-            gameState = GameState.PlayerTurn;
+            SetGameState(GameState.PlayerTurn);
 
             SetPlayerTurn(1);
         }
@@ -463,11 +447,9 @@ namespace Management
         {
             if (player1Score >= 3 || player2Score >= 3)
             {
-                gameState = GameState.GameOver;
+                // Set the game as being over
+                SetGameState(GameState.GameOver);
 
-                eventBus.Publish<int>("GameOver", player1Score > player2Score ? 1 : 2);
-
-                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
             }
             else if (IsGameboardFull())
             {
@@ -476,7 +458,7 @@ namespace Management
         }
 
         #endregion
-      
+
         #region Utility Methods
 
         /// <summary>
@@ -485,17 +467,10 @@ namespace Management
         /// <returns></returns>
         private bool IsGameboardFull()
         {
-            for (int x = 0; x < columns; x++)
+            foreach (var tile in tileBoard)
             {
-                for (int y = 0; y < rows; y++)
-                {
-                    if (tileBoard[x, y] == 0)
-                    {
-                        return false;
-                    }
-                }
+                if (tile == 0) return false;
             }
-
             return true;
         }
 
@@ -535,36 +510,35 @@ namespace Management
                 if (gameState == GameState.GamePause)
                 {
                     eventBus.Publish("OnGameResume");
-                    gameState = GameState.PlayerTurn;
+                    SetGameState(GameState.PlayerTurn);
                 }
                 else
                 {
-                    eventBus.Publish("OnGamePause");
-                    gameState = GameState.GamePause;
+                    SetGameState(GameState.GamePause);
                 }
             }
 
             // Debug
-            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.W))
-            {
-                if (gameState == GameState.GameOver)
-                {
-                    return;
-                }
+            //if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.W))
+            //{
+            //    if (gameState == GameState.GameOver)
+            //    {
+            //        return;
+            //    }
 
-                player2Score = 3;
-                CheckGameEnd();
-            }
-            else if (Input.GetKeyDown(KeyCode.W))
-            {
-                if (gameState == GameState.GameOver)
-                {
-                    return;
-                }
+            //    player2Score = 3;
+            //    CheckGameEnd();
+            //}
+            //else if (Input.GetKeyDown(KeyCode.W))
+            //{
+            //    if (gameState == GameState.GameOver)
+            //    {
+            //        return;
+            //    }
 
-                player1Score = 3;
-                CheckGameEnd();
-            }
+            //    player1Score = 3;
+            //    CheckGameEnd();
+            //}
         }
 
         #endregion
@@ -573,23 +547,26 @@ namespace Management
 
         private void SetGameState(GameState newState)
         {
+            // We don't want to unnecessarily call an event
+            if (newState == gameState)
+            {
+                return;
+            }
+
             gameState = newState;
 
             switch (newState)
             {
-                case GameState.MainMenu:
-                    break;
-                case GameState.PlayerTurn:
-                    break;
-                case GameState.RoundOver:
-                    break;
                 case GameState.GameOver:
                     eventBus.Publish<int>("GameOver", player1Score > player2Score ? 1 : 2);
+                    previewPlacementPiece.transform.position = OffscreenPosition;
                     break;
                 case GameState.GamePause:
+                    eventBus.Publish("OnGamePause");
                     break;
             }
         }
+
 
         #endregion
 
@@ -611,7 +588,7 @@ namespace Management
             if (isAIEnabled && playerTurn == 2)
             {
                 // Do not visualize the tile piece if the AI is enabled and it is the AI's turn
-                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+                previewPlacementPiece.transform.position = OffscreenPosition;
                 return;
             }
 
@@ -620,7 +597,7 @@ namespace Management
             // Clamp the column number to be within the bounds of the board
             if (colNumber == -1)
             {
-                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+                previewPlacementPiece.transform.position = OffscreenPosition;
                 return;
             }
 

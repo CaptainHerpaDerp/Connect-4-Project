@@ -1,6 +1,9 @@
 using Sirenix.OdinInspector;
 using UnityEngine;
 
+/// <summary>
+/// A piece that can be placed on the board during the placement phase, representing a player's colour.
+/// </summary>
 public class PlacementPiece : MonoBehaviour
 {
     [BoxGroup("Component References"), SerializeField] private SpriteRenderer spriteRenderer;

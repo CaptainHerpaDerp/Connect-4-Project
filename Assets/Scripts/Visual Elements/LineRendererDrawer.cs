@@ -2,10 +2,12 @@ using UnityEngine;
 
 namespace VisualElements
 {
+    /// <summary>
+    /// Works with the line renderer to draw a line between two points and display a head and tail object at the ends of the line.
+    /// </summary>
     public class LineRendererDrawer : MonoBehaviour
     {
         public LineRenderer lineRenderer;
-
 
         [SerializeField] private GameObject headObject, tailObject;
 

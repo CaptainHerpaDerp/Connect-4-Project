@@ -5,6 +5,9 @@ using Core;
 
 namespace UIManagement
 {
+    /// <summary>
+    /// Manages the score banners for each player.  
+    /// </summary>
     public class ScoreUIManager : Singleton<ScoreUIManager>
     {
         [BoxGroup("Component References"), SerializeField] private ScoreBannerGroup player1ScoreBannerGroup, player2ScoreBannerGroup;

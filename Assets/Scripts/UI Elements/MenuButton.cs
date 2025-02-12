@@ -5,6 +5,9 @@ using TMPro;
 
 namespace UIElements
 {
+    /// <summary>
+    /// A button in the main menu that changes colour when hovered over.
+    /// </summary>
     public class MenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         [BoxGroup("Component References"), SerializeField] private TextMeshProUGUI buttonText;

@@ -6,6 +6,9 @@ using Utilities;
 
 namespace UIManagement
 {
+    /// <summary>
+    /// Handles the UI elements and button interactions in the game menu.
+    /// </summary>
     public class GameMenuUIManager : Singleton<GameMenuUIManager>   
     {
         [BoxGroup("Buttons"), SerializeField] private Button menuButton, restartButton;

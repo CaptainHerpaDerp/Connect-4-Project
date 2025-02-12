@@ -8,14 +8,14 @@ using AI;
 
 namespace Management
 {
-    public enum GameState { MainMenu, PlayerTurn, RoundOver, GameOver }
+    public enum GameState { MainMenu, PlayerTurn, RoundOver, GameOver, GamePause }
 
     public class GameManager : Singleton<GameManager>
     {
         #region Serialized Fields
 
         [BoxGroup("Components"), SerializeField] GameBoard gameBoard;
-        [BoxGroup("Components"), SerializeField] LineRenderer lineRenderer;
+        [BoxGroup("Components"), SerializeField] LineRendererDrawer lineRenderer;
 
         [BoxGroup("Prefabs"), SerializeField] GameObject tileSpacePrefab;
         [BoxGroup("Prefabs"), SerializeField] PlacementPiece placementPiecePrefab;
@@ -25,6 +25,12 @@ namespace Management
         [BoxGroup("Tile Placement"), SerializeField] private Transform tilePlacementAreaTransform;
         [BoxGroup("Tile Placement"), SerializeField] private Transform tilePieceParentTransform;
 
+        [Header("The height of the preview tile piece above the game board")]
+        [BoxGroup("Visual Settings"), SerializeField] private float tilePieceYPos;
+
+        [Header("The delay before showing a connection with a line renderer")]
+        [BoxGroup("Visual Settings"), SerializeField] private float connectionShowDelay = 0.5f;
+
         [Header("The duration of time a match will be shown before the round is reset")]
         [BoxGroup("Visual Settings"), SerializeField] private float connectionShowDuration = 0.5f;
 
@@ -33,6 +39,8 @@ namespace Management
 
         [Header("The minimum wait duration before another tile can be placed")]
         [BoxGroup("Placement Settings"), SerializeField] private float minPlaceWaitTime = 0.5f;
+
+        [BoxGroup("Key Codes"), SerializeField] private KeyCode menuKey = KeyCode.Escape;
 
         [BoxGroup("AI Settings"), SerializeField] private bool isAIEnabled = false;
 
@@ -60,32 +68,28 @@ namespace Management
         // The tile piece that will be placed on the board
         private PlacementPiece previewPlacementPiece;
 
-        [SerializeField] private float tilePieceYPos;
         private bool isDropping = false;
 
         // Tile Waiting
         private bool isOnPlaceCooldown = false;
 
-        [SerializeField] private bool aiPlaced = false;
+        private bool aiPlaced = false;
 
         // Singletons
         private EventBus eventBus;
         private AIPlayer aiPlayer;
 
         // Game State
-        [SerializeField] private GameState gameState = GameState.MainMenu;
+        private GameState gameState = GameState.MainMenu;
 
         // Game State Getters
         private bool isRoundOver => gameState == GameState.RoundOver;
-        private bool isGameActive => (gameState != GameState.MainMenu && gameState != GameState.GameOver);
+        private bool isGameActive => (gameState != GameState.MainMenu && gameState != GameState.GameOver && gameState != GameState.GamePause);
 
         // Game Prefs Getters
         private int rows => GamePrefs.Rows;
         private int columns => GamePrefs.Columns;
         private int tilesToWin => GamePrefs.TilesToWin;
-
-        [SerializeField] private bool debugAIMove = false;
-        [SerializeField] private bool useAIV21v1 = false;
 
         #region Initialization
 
@@ -134,7 +138,14 @@ namespace Management
 
             eventBus.Subscribe("OnReturnMenu", () =>
             {
+                // Clear the game board
+                RestartGame();
+
+                // Reset the game state to the main menu
                 gameState = GameState.MainMenu;
+
+                // Hide the preview tile piece
+                previewPlacementPiece.transform.position = new Vector2(1000, 1000);
             });
         }
 
@@ -219,23 +230,11 @@ namespace Management
         {
             if (isGameActive)
             {
-                if (debugAIMove)
-                {
-                    DoAIVS();
-                }
-                else
-                {
-                    DoPlayerTurns();
-                    DoTilePieceVisualization();
-                }
+                DoPlayerTurns();
+                DoTilePieceVisualization();               
             }
 
-            // Debugging purposes
-            if (Input.GetKeyDown(KeyCode.W))
-            {
-                player1Score = 3;
-                CheckGameEnd();
-            }
+            CheckKeys();
         }
 
         #endregion
@@ -250,50 +249,7 @@ namespace Management
             {
                 isOnPlaceCooldown = false;
             }));
-        }
-
-        // Have the AI compete against itself in a 1v1 match
-        private void DoAIVS()
-        {
-            if (isAIEnabled && !isRoundOver && !aiPlaced)
-            {
-                if (playerTurn == 1)
-                {
-                    aiPlayer.GetMoveAsync(tileBoard, (bestMove) =>
-                    {
-                        // Wait until the tile placement is off cooldown before placing the tile
-                        StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isOnPlaceCooldown, () =>
-                        {
-                            PlaceTileOnColumn(bestMove, playerTurn);
-                        }));
-                    });
-                }
-                else
-                {
-                    aiPlayer.GetMoveAsync(tileBoard, (bestMove) =>
-                    {
-                        // Wait until the tile placement is off cooldown before placing the tile
-                        StartCoroutine(Utils.WaitConditionAndExecuteCR(() => !isOnPlaceCooldown, () =>
-                        {
-                            PlaceTileOnColumn(bestMove, playerTurn);
-                        }));
-                    });
-                }
-
-                aiPlaced = true;
-            }
-            else
-            {
-                if (isRoundOver)
-                {
-                    Debug.Log("Round Over");    
-                }
-                else if (aiPlaced)
-                {
-                    Debug.Log("AI Placed");
-                }
-            }
-        }
+        }  
 
         private void DoPlayerTurns()
         {
@@ -394,11 +350,6 @@ namespace Management
             {
                 aiPlaced = false;
             }
-
-            if (debugAIMove)
-            {
-                aiPlaced = false;
-            }
         }
 
         /// <summary>
@@ -409,7 +360,7 @@ namespace Management
             (bool isMatchHor, int leftColIndex, int rightColIndex) = TilePatternCheck.CheckHorizontal(tileBoard, placedCol, placedRow, player);
             if (isMatchHor)
             {
-                DrawLineRenderer(tileObjects[leftColIndex, placedRow].transform.position, tileObjects[rightColIndex, placedRow].transform.position);
+                DrawLineRenderer(tileObjects[leftColIndex, placedRow].transform.position, tileObjects[rightColIndex, placedRow].transform.position, player);
                 EndRound(player);
                 return;
             }
@@ -417,7 +368,7 @@ namespace Management
             (bool isMatchVert, int topRowIndex, int bottomRowIndex) = TilePatternCheck.CheckVertical(tileBoard, placedCol, placedRow, player);
             if (isMatchVert)
             {
-                DrawLineRenderer(tileObjects[placedCol, bottomRowIndex].transform.position, tileObjects[placedCol, topRowIndex].transform.position);
+                DrawLineRenderer(tileObjects[placedCol, bottomRowIndex].transform.position, tileObjects[placedCol, topRowIndex].transform.position, player);
                 EndRound(player);
                 return;
             }
@@ -425,7 +376,7 @@ namespace Management
             (bool isMatchDiag, Vector2 indice1, Vector2 indice2) = TilePatternCheck.CheckDiagonal(tileBoard, placedCol, placedRow, player);
             if (isMatchDiag)
             {
-                DrawLineRenderer(tileObjects[(int)indice1.x, (int)indice1.y].transform.position, tileObjects[(int)indice2.x, (int)indice2.y].transform.position);
+                DrawLineRenderer(tileObjects[(int)indice1.x, (int)indice1.y].transform.position, tileObjects[(int)indice2.x, (int)indice2.y].transform.position, player);
                 EndRound(player);
                 return;
             }
@@ -443,6 +394,8 @@ namespace Management
 
                 StartCoroutine(Utils.WaitDurationAndExecuteCR(connectionShowDuration, () =>
                 {
+                    // Reset the round if the game is still active
+                    if (isGameActive)
                     ResetRound();
                 }));
 
@@ -485,7 +438,7 @@ namespace Management
         private void ResetPlacedPieces()
         {
             // Hide the line renderer
-            lineRenderer.positionCount = 0;
+            lineRenderer.Hide();
 
             // Reset the ownership of each tile on the board
             tileBoard = new int[columns, rows];
@@ -514,15 +467,37 @@ namespace Management
 
                 eventBus.Publish<int>("GameOver", player1Score > player2Score ? 1 : 2);
 
-                // Hide the line renderer and the preview tile piece
-                lineRenderer.enabled = false;
                 previewPlacementPiece.transform.position = new Vector2(1000, 1000);
+            }
+            else if (IsGameboardFull())
+            {
+                ResetRound();
             }
         }
 
         #endregion
       
         #region Utility Methods
+
+        /// <summary>
+        /// Return true if the game board no longer has any empty spaces (tie)
+        /// </summary>
+        /// <returns></returns>
+        private bool IsGameboardFull()
+        {
+            for (int x = 0; x < columns; x++)
+            {
+                for (int y = 0; y < rows; y++)
+                {
+                    if (tileBoard[x, y] == 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Returns the position above the board where the tile piece will be dropped from
@@ -539,6 +514,82 @@ namespace Management
             return position;
         }
 
+
+        #endregion
+
+        #region Keycode Methods
+
+        /// <summary>
+        /// Check if a key is pressed
+        /// </summary>
+        private void CheckKeys()
+        {
+            if (Input.GetKeyDown(menuKey))
+            {
+                // Don't pause/unpause if the game is over (menu is already shown)
+                if (gameState == GameState.GameOver)
+                {
+                    return;
+                }
+
+                if (gameState == GameState.GamePause)
+                {
+                    eventBus.Publish("OnGameResume");
+                    gameState = GameState.PlayerTurn;
+                }
+                else
+                {
+                    eventBus.Publish("OnGamePause");
+                    gameState = GameState.GamePause;
+                }
+            }
+
+            // Debug
+            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.W))
+            {
+                if (gameState == GameState.GameOver)
+                {
+                    return;
+                }
+
+                player2Score = 3;
+                CheckGameEnd();
+            }
+            else if (Input.GetKeyDown(KeyCode.W))
+            {
+                if (gameState == GameState.GameOver)
+                {
+                    return;
+                }
+
+                player1Score = 3;
+                CheckGameEnd();
+            }
+        }
+
+        #endregion
+
+        #region Game State Management
+
+        private void SetGameState(GameState newState)
+        {
+            gameState = newState;
+
+            switch (newState)
+            {
+                case GameState.MainMenu:
+                    break;
+                case GameState.PlayerTurn:
+                    break;
+                case GameState.RoundOver:
+                    break;
+                case GameState.GameOver:
+                    eventBus.Publish<int>("GameOver", player1Score > player2Score ? 1 : 2);
+                    break;
+                case GameState.GamePause:
+                    break;
+            }
+        }
 
         #endregion
 
@@ -581,13 +632,12 @@ namespace Management
             isAIEnabled = !isAIEnabled;
         }
 
-        private void DrawLineRenderer(Vector2 startPos, Vector2 endPos)
+        private void DrawLineRenderer(Vector2 startPos, Vector2 endPos, int player)
         {
-            lineRenderer.positionCount = 2;
-            lineRenderer.SetPosition(0, startPos);
-            lineRenderer.SetPosition(1, endPos);
-
-            lineRenderer.enabled = false;
+            StartCoroutine(Utils.WaitDurationAndExecuteCR(connectionShowDelay, () =>
+            {
+                lineRenderer.Show(startPos, endPos);
+            }));
         }
     }
 }

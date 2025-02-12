@@ -125,7 +125,7 @@ namespace UIManagement
 
         private void QuitGame()
         {
-            HideMainMenu();
+            Application.Quit();
         }
 
         #endregion

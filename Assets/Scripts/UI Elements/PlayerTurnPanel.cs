@@ -5,6 +5,9 @@ using TMPro;
 
 namespace UIElements
 {
+    /// <summary>
+    /// Panel that displays the player's name, as well as a dynamic caption
+    /// </summary>
     public class PlayerTurnPanel : MonoBehaviour
     {
         [BoxGroup("Component References"), SerializeField] private CanvasGroup canvasGroup;
@@ -14,6 +17,7 @@ namespace UIElements
         [BoxGroup("Visibility Settings"), SerializeField] private float fadedAlpha = 0.5f;
 
         [BoxGroup("Text Settings"), SerializeField] private string winnerText = "You Win!";
+        [BoxGroup("Text Settings"), SerializeField] private string loserText = "You Lose!";
         [BoxGroup("Text Settings"), SerializeField] private string turnText = "Your Turn!";
 
 
@@ -70,7 +74,7 @@ namespace UIElements
         /// <summary>
         /// Sets the text to the winner text.
         /// </summary>
-        public void SetWinner()
+        public virtual void SetWinner()
         {
             // Show the panel in case it's hidden
             SetVisibility(true);
@@ -81,9 +85,20 @@ namespace UIElements
         }
 
         /// <summary>
+        /// Only displayed in the case that the player is playing against the AI (AI is not a player, therefore they shouldn't be told that they have won)
+        /// </summary>
+        public void SetLoser()
+        {
+            SetVisibility(true);
+
+            captionTextComponent.gameObject.SetActive(true);
+            captionTextComponent.text = loserText;
+        }
+
+        /// <summary>
         /// Reverse the text back to the original turn text.
         /// </summary>
-        public void ResetText()
+        public virtual void ResetText()
         {
             captionTextComponent.text = turnText;
         }

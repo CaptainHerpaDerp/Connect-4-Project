@@ -23,6 +23,8 @@ namespace UIManagement
             mainMenuUIManager = MainMenuUIManager.Instance;
 
             eventBus.Subscribe<int>("GameOver", ShowMenu);
+            eventBus.Subscribe("OnGamePause", ShowMenu);
+            eventBus.Subscribe("OnGameResume", HideMenu);
         }
 
         #region Button Subscriptions
@@ -61,6 +63,11 @@ namespace UIManagement
         #endregion
 
         #region Visibility Methods
+
+        private void ShowMenu()
+        {
+            StartCoroutine(Utils.FadeInCanvasGroup(gameMenuCanvasGroup, 0.5f));
+        }
 
         private void ShowMenu(int _)
         {

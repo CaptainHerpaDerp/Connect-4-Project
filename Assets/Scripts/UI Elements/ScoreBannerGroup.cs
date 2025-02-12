@@ -59,7 +59,7 @@ namespace UIElements
             {
                 if (!child.gameObject.activeSelf)
                 {
-                    child.gameObject.SetActive(true);
+                    child.gameObject.SetActive(true); 
                     return;
                 }
             }
@@ -72,7 +72,7 @@ namespace UIElements
         {
             foreach (Transform child in scoreLayoutGroupParent.transform)
             {
-                Destroy(child.gameObject);
+                child.gameObject.SetActive(false);
             }
         }
     }

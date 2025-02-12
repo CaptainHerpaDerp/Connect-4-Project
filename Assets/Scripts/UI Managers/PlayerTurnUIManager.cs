@@ -23,9 +23,11 @@ namespace UIManagement {
 
             eventBus.Subscribe<bool>("OnGameStart", SetPlayerFrames);
 
-            eventBus.Subscribe<int>("GameOver", SetPlayerWinnder);
+            eventBus.Subscribe<int>("GameOver", SetPlayerWinner);
 
+            // Reset the player frames when the game is restarted or the player returns to the main menu
             eventBus.Subscribe("OnGameRestart", ResetPlayerFrames);
+            eventBus.Subscribe("OnReturnMenu", ResetPlayerFrames);
         }
 
         private void SetPlayerFrames(bool isAIEnabled)
@@ -78,14 +80,28 @@ namespace UIManagement {
             }
         }
 
-        private void SetPlayerWinnder(int winner)
+        /// <summary>
+        /// Set the panels so that they display the winner and the loser as their captions
+        /// </summary>
+        /// <param name="winner"></param>
+        private void SetPlayerWinner(int winner)
         {
             PlayerTurnPanel winnerPanel = winner == 1 ? player1TurnPanel : activePlayer2TurnPanel;
             PlayerTurnPanel loserPanel = winner == 1 ? activePlayer2TurnPanel : player1TurnPanel;
 
-            winnerPanel.SetWinner();
+            // If the AI wins, we're not going to tell them that they have won, we will display the player's panel as having lost, and hide the AI's panel
+            if (winner == 2 && activePlayer2TurnPanel == cpuTurnPanel)
+            {
+                winnerPanel.Hide();
+                loserPanel.SetLoser();
+            }
 
-            loserPanel.Hide();
+            // Otherwise, display the winner's panel and hide the loser's panel
+            else
+            {
+                winnerPanel.SetWinner();
+                loserPanel.Hide();
+            }
         }
     }
 }

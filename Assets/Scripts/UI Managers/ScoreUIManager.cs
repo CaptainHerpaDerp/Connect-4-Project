@@ -18,7 +18,9 @@ namespace UIManagement
 
             eventBus.Subscribe<int>("RoundOver", SetPlayerScore);
 
+            // Reset the player scores when the game is restarted or the player returns to the main menu    
             eventBus.Subscribe("OnGameRestart", ResetScores);
+            eventBus.Subscribe("OnReturnMenu", ResetScores);
 
             // Assign the player colours
 
@@ -41,6 +43,8 @@ namespace UIManagement
 
         public void ResetScores()
         {
+            Debug.Log("Resetting Scores");
+
             player1ScoreBannerGroup.ResetPlayerScore();
             player2ScoreBannerGroup.ResetPlayerScore();
         }

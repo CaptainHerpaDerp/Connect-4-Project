@@ -221,13 +221,13 @@ namespace Utilities
             canvasGroup.blocksRaycasts = false;
         }
 
-        public static IEnumerator FadeInCanvasGroup(CanvasGroup canvasGroup, float fadeOutTime, float fromAlpha = 0, float targetAlpha = 1)
+        public static IEnumerator FadeInCanvasGroup(CanvasGroup canvasGroup, float fadeInTime, float fromAlpha = 0, float targetAlpha = 1)
         {
             float timeElapsed = 0;
 
-            while (timeElapsed < fadeOutTime)
+            while (timeElapsed < fadeInTime)
             {
-                canvasGroup.alpha = Mathf.Lerp(fromAlpha, targetAlpha, timeElapsed / fadeOutTime);
+                canvasGroup.alpha = Mathf.Lerp(fromAlpha, targetAlpha, timeElapsed / fadeInTime);
                 timeElapsed += Time.fixedDeltaTime;
                 yield return new WaitForFixedUpdate();
             }

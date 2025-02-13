@@ -26,6 +26,8 @@ namespace CameraControl
             public int left, top, right, bottom;
         }
 
+#if !UNITY_EDITOR
+
         void Start()
         {
             unityWindow = GetActiveWindow();
@@ -47,5 +49,6 @@ namespace CameraControl
                 SetWindowPos(unityWindow, IntPtr.Zero, winRect.left, winRect.top, newSize, newSize, SWP_NOZORDER | SWP_FRAMECHANGED);
             }
         }
+#endif
     }
 }
